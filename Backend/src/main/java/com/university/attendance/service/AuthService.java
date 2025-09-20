@@ -12,6 +12,7 @@ import com.university.attendance.repository.TeacherRepository;
 import com.university.attendance.repository.UserRepository;
 import com.university.attendance.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -43,6 +44,9 @@ public class AuthService {
     
     @Autowired
     private AuthenticationManager authenticationManager;
+
+    @Value("${admin.signup.secret:}")
+    private String adminSignupSecret;
     
     public AuthResponse login(LoginRequest loginRequest) {
         Authentication authentication = authenticationManager.authenticate(
@@ -84,6 +88,9 @@ public class AuthService {
             user = createStudent(signupRequest);
         } else if (signupRequest.getRole() == UserRole.TEACHER) {
             user = createTeacher(signupRequest);
+        } else if (signupRequest.getRole() == UserRole.ADMIN) {
+            validateAdminSecret(signupRequest);
+            user = createAdmin(signupRequest);
         } else {
             throw new RuntimeException("Invalid role specified");
         }
@@ -123,10 +130,40 @@ public class AuthService {
             passwordEncoder.encode(request.getPassword()),
             request.getDepartment(),
             request.getDesignation(),
-            null // photo
+            null, // photo
+            request.getBatch() // Teachers may not have batch, could be null
         );
         
         return teacherRepository.save(teacher);
+    }
+    
+    private User createAdmin(SignupRequest request) {
+        User admin = new User(
+            request.getFirstName(),
+            request.getMiddleName(),
+            request.getLastName(),
+            request.getEmail(),
+            request.getPhone(),
+            request.getUsername(),
+            passwordEncoder.encode(request.getPassword()),
+            UserRole.ADMIN,
+            request.getBatch() // Admin may not have batch, could be null
+        );
+        return userRepository.save(admin);
+    }
+
+    private void validateAdminSecret(SignupRequest request) {
+        String expected = adminSignupSecret;
+        if (expected == null || expected.isBlank()) {
+            expected = System.getenv("ADMIN_SIGNUP_SECRET");
+        }
+        if (expected == null || expected.isBlank()) {
+            throw new RuntimeException("Admin signup is not configured. Contact system administrator.");
+        }
+        String provided = request.getAdminSecret();
+        if (provided == null || !provided.equals(expected)) {
+            throw new RuntimeException("Invalid admin secret");
+        }
     }
     
     public Optional<User> getUserByUsername(String username) {

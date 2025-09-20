@@ -28,16 +28,16 @@ public class User implements UserDetails {
     
     @NotBlank(message = "First name is required")
     @Size(max = 50)
-    @Column(name = "firstName", nullable = false)
+    @Column(name = "first_name", nullable = false)
     private String firstName;
     
     @Size(max = 50)
-    @Column(name = "middleName")
+    @Column(name = "middle_name")
     private String middleName;
     
     @NotBlank(message = "Last name is required")
     @Size(max = 50)
-    @Column(name = "lastName", nullable = false)
+    @Column(name = "last_name", nullable = false)
     private String lastName;
     
     @Email(message = "Email should be valid")
@@ -63,6 +63,10 @@ public class User implements UserDetails {
     @Column(name = "role", nullable = false)
     private UserRole role;
     
+    @Size(max = 20)
+    @Column(name = "batch")
+    private String batch;
+    
     @Column(name = "enabled", nullable = false)
     private boolean enabled = true;
     
@@ -79,7 +83,7 @@ public class User implements UserDetails {
     public User() {}
     
     public User(String firstName, String middleName, String lastName, String email, 
-                String phone, String username, String password, UserRole role) {
+                String phone, String username, String password, UserRole role, String batch) {
         this.firstName = firstName;
         this.middleName = middleName;
         this.lastName = lastName;
@@ -89,6 +93,7 @@ public class User implements UserDetails {
         this.username = username;
         this.password = password;
         this.role = role;
+        this.batch = batch;
     }
     
     // Getters and Setters
@@ -170,6 +175,14 @@ public class User implements UserDetails {
     
     public void setRole(UserRole role) {
         this.role = role;
+    }
+    
+    public String getBatch() {
+        return batch;
+    }
+    
+    public void setBatch(String batch) {
+        this.batch = batch;
     }
     
     // UserDetails implementation

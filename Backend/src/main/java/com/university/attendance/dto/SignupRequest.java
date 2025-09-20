@@ -38,6 +38,9 @@ public class SignupRequest {
     
     private UserRole role;
     
+    // Admin signup secret (required only for ADMIN role)
+    private String adminSecret;
+    
     // Student specific fields
     @Size(max = 100)
     private String department;
@@ -126,6 +129,14 @@ public class SignupRequest {
     
     public void setRole(UserRole role) {
         this.role = role;
+    }
+    
+    public String getAdminSecret() {
+        return adminSecret;
+    }
+    
+    public void setAdminSecret(String adminSecret) {
+        this.adminSecret = adminSecret;
     }
     
     public String getDepartment() {

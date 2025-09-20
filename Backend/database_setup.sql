@@ -6,14 +6,15 @@ USE attendance_tracker;
 CREATE TABLE IF NOT EXISTS users (
     userID BIGINT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
-    firstName VARCHAR(50) NOT NULL,
-    middleName VARCHAR(50),
-    lastName VARCHAR(50) NOT NULL,
+    first_name VARCHAR(50) NOT NULL,
+    middle_name VARCHAR(50),
+    last_name VARCHAR(50) NOT NULL,
     email VARCHAR(100),
     phone VARCHAR(20),
     username VARCHAR(50) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
     role ENUM('STUDENT', 'TEACHER', 'ADMIN') NOT NULL,
+    batch VARCHAR(20),
     enabled BOOLEAN NOT NULL DEFAULT TRUE,
     account_non_expired BOOLEAN NOT NULL DEFAULT TRUE,
     account_non_locked BOOLEAN NOT NULL DEFAULT TRUE,
@@ -132,50 +133,34 @@ CREATE TABLE IF NOT EXISTS student_course_enrollment (
     UNIQUE KEY unique_student_course (studentID, courseCode)
 );
 
--- Insert sample data
-INSERT INTO users (firstName, middleName, lastName, name, email, phone, username, password, role) VALUES
-('John', 'Michael', 'Doe', 'John Michael Doe', 'john.doe@university.edu', '1234567890', 'student1', '$2a$10$qJC9DBZg9rVjTwkQzX4gmunHsZQDZGlzPHWi0EAKvVnE75xGKWqT.', 'STUDENT'),
-('Jane', 'Elizabeth', 'Smith', 'Jane Elizabeth Smith', 'jane.smith@university.edu', '1234567891', 'teacher1', '$2a$10$qJC9DBZg9rVjTwkQzX4gmunHsZQDZGlzPHWi0EAKvVnE75xGKWqT.', 'TEACHER'),
-('Admin', NULL, 'User', 'Admin User', 'admin@university.edu', '1234567892', 'admin1', '$2a$10$qJC9DBZg9rVjTwkQzX4gmunHsZQDZGlzPHWi0EAKvVnE75xGKWqT.', 'ADMIN');
+-- Create class_sessions table
+CREATE TABLE IF NOT EXISTS class_sessions (
+    sessionID BIGINT AUTO_INCREMENT PRIMARY KEY,
+    courseCode VARCHAR(20),
+    scheduled_time TIMESTAMP,
+    duration INT,
+    access_code VARCHAR(255),
+    expiry_time TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (courseCode) REFERENCES courses(courseCode) ON DELETE CASCADE
+);
 
--- Insert sample student data
-INSERT INTO students (studentID, department, batch, section) VALUES
-(1, 'Computer Science', '2024', 'A');
+-- Create attendance table
+CREATE TABLE IF NOT EXISTS attendance (
+    attendanceID BIGINT AUTO_INCREMENT PRIMARY KEY,
+    studentID BIGINT NOT NULL,
+    courseCode VARCHAR(20),
+    sessionID BIGINT,
+    attendance_code VARCHAR(255) NOT NULL,
+    timestamp TIMESTAMP NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_student_session (studentID, sessionID),
+    FOREIGN KEY (studentID) REFERENCES students(studentID) ON DELETE CASCADE,
+    FOREIGN KEY (courseCode) REFERENCES courses(courseCode) ON DELETE CASCADE,
+    FOREIGN KEY (sessionID) REFERENCES class_sessions(sessionID) ON DELETE CASCADE
+);
 
--- Insert sample teacher data
-INSERT INTO teachers (teacherID, department, designation) VALUES
-(2, 'Computer Science', 'Professor');
-
--- Insert sample courses
-INSERT INTO courses (courseCode, course_title, credit_hour, class_schedule) VALUES
-('CS101', 'Introduction to Computer Science', 3, 'Monday, Wednesday, Friday 9:00-10:00 AM'),
-('CS201', 'Data Structures and Algorithms', 3, 'Tuesday, Thursday 10:00-11:30 AM'),
-('CS301', 'Database Systems', 3, 'Monday, Wednesday 2:00-3:30 PM'),
-('CS401', 'Software Engineering', 3, 'Tuesday, Thursday 1:00-2:30 PM');
-
--- Insert sample class sessions
-INSERT INTO class_sessions (courseCode, scheduled_time, duration, access_code) VALUES
-('CS101', '2024-01-15 09:00:00', 60, 'CS101_001'),
-('CS101', '2024-01-17 09:00:00', 60, 'CS101_002'),
-('CS201', '2024-01-16 10:00:00', 90, 'CS201_001');
-
--- Insert sample attendance
-INSERT INTO attendance (studentID, courseCode, sessionID, status, biometric_verified, location_verified) VALUES
-(1, 'CS101', 1, 'PRESENT', TRUE, TRUE),
-(1, 'CS101', 2, 'PRESENT', TRUE, TRUE),
-(1, 'CS201', 3, 'LATE', TRUE, FALSE);
-
--- Insert sample attendance stats
-INSERT INTO attendance_stats (studentID, courseCode, total_classes, attended, absent, percentage) VALUES
-(1, 'CS101', 2, 2, 0, 100.00),
-(1, 'CS201', 1, 1, 0, 100.00);
-
--- Insert sample teacher course assignments
-INSERT INTO teacher_course_assignment (teacherID, courseCode) VALUES
-(2, 'CS101'),
-(2, 'CS201');
-
--- Insert sample student course enrollments
-INSERT INTO student_course_enrollment (studentID, courseCode) VALUES
-(1, 'CS101'),
-(1, 'CS201');
+-- Database schema created. No sample data included.
+-- Users must be created through the signup process.

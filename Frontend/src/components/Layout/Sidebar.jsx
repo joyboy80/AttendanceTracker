@@ -13,6 +13,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
       case 'STUDENT':
         return [
           { path: '/student', icon: 'fas fa-tachometer-alt', label: 'Dashboard' },
+          { path: '/student/courses', icon: 'fas fa-graduation-cap', label: 'My Courses' },
           { path: '/student/attendance', icon: 'fas fa-check-circle', label: 'Give Attendance' },
           { path: '/student/statistics', icon: 'fas fa-chart-bar', label: 'Statistics' },
         ];
@@ -26,6 +27,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         return [
           { path: '/admin', icon: 'fas fa-tachometer-alt', label: 'Dashboard' },
           { path: '/admin/users', icon: 'fas fa-users', label: 'User Management' },
+          { path: '/admin/courses', icon: 'fas fa-book', label: 'Course Management' },
           { path: '/admin/routine', icon: 'fas fa-calendar-alt', label: 'Routine Management' },
           { path: '/admin/overview', icon: 'fas fa-chart-pie', label: 'Attendance Overview' },
         ];

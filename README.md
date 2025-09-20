@@ -161,10 +161,15 @@ Content-Type: application/json
   "username": "student1",
   "password": "password123",
   "confirmPassword": "password123",
-  "role": "STUDENT",
+  "role": "STUDENT", // STUDENT | TEACHER | ADMIN
+  // Student only
   "department": "Computer Science",
   "batch": "2024",
-  "section": "A"
+  "section": "A",
+  // Teacher only
+  "designation": "Professor",
+  // Admin only
+  "adminSecret": "<secret>"
 }
 ```
 
@@ -312,10 +317,8 @@ cors:
 
 ## 🧪 Testing
 
-### Demo Accounts
-- **Student**: `student1` / `password`
-- **Teacher**: `teacher1` / `password`
-- **Admin**: `admin1` / `password`
+### Getting Started
+Create your first account using the signup page. Admin accounts require the secret key configured in your environment.
 
 ### API Testing with cURL
 
@@ -323,7 +326,7 @@ cors:
 ```bash
 curl -X POST http://localhost:8080/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"student1","password":"password"}'
+  -d '{"username":"your_username","password":"your_password"}'
 ```
 
 #### Signup Test
@@ -336,10 +339,24 @@ curl -X POST http://localhost:8080/api/auth/signup \
     "username":"testuser",
     "password":"password123",
     "confirmPassword":"password123",
-    "role":"STUDENT",
-    "department":"Computer Science",
-    "batch":"2024"
+    "role":"ADMIN",
+    "adminSecret":"$ADMIN_SIGNUP_SECRET"
   }'
+```
+
+### Environment Variables
+
+Create a `.env` file in the `Backend/` folder and set:
+```
+ADMIN_SIGNUP_SECRET=your_strong_secret_here
+```
+
+The backend loads this value at runtime and validates admin signup requests against it.
+
+**Example `.env` file in `Backend/.env`:**
+```
+# Admin Signup Secret
+ADMIN_SIGNUP_SECRET=my_super_secret_admin_key_123
 ```
 
 ## 🚀 Deployment

@@ -6,6 +6,7 @@ import AdminOverview from '../Admin/AdminOverview';
 import UserManagement from '../Admin/UserManagement';
 import RoutineManagement from '../Admin/RoutineManagement';
 import AttendanceOverview from '../Admin/AttendanceOverview';
+import CourseManagement from '../Admin/CourseManagement';
 
 const AdminDashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -18,6 +19,8 @@ const AdminDashboard = () => {
     switch (pathname) {
       case '/admin/users':
         return 'User Management';
+      case '/admin/courses':
+        return 'Course Management';
       case '/admin/routine':
         return 'Routine Management';
       case '/admin/overview':
@@ -41,6 +44,7 @@ const AdminDashboard = () => {
           <Routes>
             <Route path="/" element={<AdminOverview />} />
             <Route path="/users" element={<UserManagement />} />
+            <Route path="/courses" element={<CourseManagement />} />
             <Route path="/routine" element={<RoutineManagement />} />
             <Route path="/overview" element={<AttendanceOverview />} />
           </Routes>

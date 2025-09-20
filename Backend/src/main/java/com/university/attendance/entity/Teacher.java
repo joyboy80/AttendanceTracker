@@ -29,8 +29,8 @@ public class Teacher extends User {
     
     public Teacher(String firstName, String middleName, String lastName, String email, 
                    String phone, String username, String password, String department, 
-                   String designation, String photo) {
-        super(firstName, middleName, lastName, email, phone, username, password, UserRole.TEACHER);
+                   String designation, String photo, String batch) {
+        super(firstName, middleName, lastName, email, phone, username, password, UserRole.TEACHER, batch);
         this.department = department;
         this.designation = designation;
         this.photo = photo;

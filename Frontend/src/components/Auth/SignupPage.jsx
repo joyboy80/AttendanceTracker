@@ -18,7 +18,9 @@ const SignupPage = () => {
     batch: '',
     section: '',
     // Teacher specific fields
-    designation: ''
+    designation: '',
+    // Admin specific fields
+    adminSecret: ''
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -62,6 +64,13 @@ const SignupPage = () => {
       return false;
     }
 
+    if (formData.role === 'ADMIN') {
+      if (!formData.adminSecret) {
+        setError('Admin secret is required for admin registration');
+        return false;
+      }
+    }
+
     return true;
   };
 
@@ -101,7 +110,8 @@ const SignupPage = () => {
           department: '',
           batch: '',
           section: '',
-          designation: ''
+          designation: '',
+          adminSecret: ''
         });
       } else {
         setError(data.message || 'Registration failed');
@@ -125,7 +135,7 @@ const SignupPage = () => {
           <div className="mb-3">
             <label className="form-label">Account Type *</label>
             <div className="row">
-              <div className="col-6">
+              <div className="col-4">
                 <div className="form-check">
                   <input
                     className="form-check-input"
@@ -141,7 +151,7 @@ const SignupPage = () => {
                   </label>
                 </div>
               </div>
-              <div className="col-6">
+              <div className="col-4">
                 <div className="form-check">
                   <input
                     className="form-check-input"
@@ -154,6 +164,22 @@ const SignupPage = () => {
                   />
                   <label className="form-check-label" htmlFor="teacher">
                     Teacher
+                  </label>
+                </div>
+              </div>
+              <div className="col-4">
+                <div className="form-check">
+                  <input
+                    className="form-check-input"
+                    type="radio"
+                    name="role"
+                    id="admin"
+                    value="ADMIN"
+                    checked={formData.role === 'ADMIN'}
+                    onChange={handleChange}
+                  />
+                  <label className="form-check-label" htmlFor="admin">
+                    Admin
                   </label>
                 </div>
               </div>
@@ -239,33 +265,35 @@ const SignupPage = () => {
                 required
               />
             </div>
-            <div className="col-md-6 mb-3">
-              <label htmlFor="department" className="form-label">Department *</label>
-              <select
-                className="form-select"
-                id="department"
-                name="department"
-                value={formData.department}
-                onChange={handleChange}
-                required
-              >
-                <option value="">Select Department</option>
-                <option value="Computer Science">Computer Science</option>
-                <option value="Information Technology">Information Technology</option>
-                <option value="Software Engineering">Software Engineering</option>
-                <option value="Data Science">Data Science</option>
-                <option value="Cybersecurity">Cybersecurity</option>
-                <option value="Mathematics">Mathematics</option>
-                <option value="Physics">Physics</option>
-                <option value="Chemistry">Chemistry</option>
-                <option value="Biology">Biology</option>
-                <option value="Business Administration">Business Administration</option>
-                <option value="Economics">Economics</option>
-                <option value="Psychology">Psychology</option>
-                <option value="English">English</option>
-                <option value="History">History</option>
-              </select>
-            </div>
+            {(formData.role === 'STUDENT' || formData.role === 'TEACHER') && (
+              <div className="col-md-6 mb-3">
+                <label htmlFor="department" className="form-label">Department *</label>
+                <select
+                  className="form-select"
+                  id="department"
+                  name="department"
+                  value={formData.department}
+                  onChange={handleChange}
+                  required
+                >
+                  <option value="">Select Department</option>
+                  <option value="Computer Science">Computer Science</option>
+                  <option value="Information Technology">Information Technology</option>
+                  <option value="Software Engineering">Software Engineering</option>
+                  <option value="Data Science">Data Science</option>
+                  <option value="Cybersecurity">Cybersecurity</option>
+                  <option value="Mathematics">Mathematics</option>
+                  <option value="Physics">Physics</option>
+                  <option value="Chemistry">Chemistry</option>
+                  <option value="Biology">Biology</option>
+                  <option value="Business Administration">Business Administration</option>
+                  <option value="Economics">Economics</option>
+                  <option value="Psychology">Psychology</option>
+                  <option value="English">English</option>
+                  <option value="History">History</option>
+                </select>
+              </div>
+            )}
           </div>
 
           {/* Student Specific Fields */}
@@ -320,6 +348,23 @@ const SignupPage = () => {
                 <option value="Visiting Professor">Visiting Professor</option>
                 <option value="Adjunct Professor">Adjunct Professor</option>
               </select>
+            </div>
+          )}
+
+          {/* Admin Specific Fields */}
+          {formData.role === 'ADMIN' && (
+            <div className="mb-3">
+              <label htmlFor="adminSecret" className="form-label">Admin Secret *</label>
+              <input
+                type="password"
+                className="form-control"
+                id="adminSecret"
+                name="adminSecret"
+                value={formData.adminSecret}
+                onChange={handleChange}
+                required
+              />
+              <div className="form-text">Enter the secret provided by your system administrator.</div>
             </div>
           )}
 

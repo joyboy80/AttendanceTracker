@@ -5,6 +5,7 @@ import Header from '../Layout/Header';
 import StudentOverview from '../Student/StudentOverview';
 import AttendancePage from '../Student/AttendancePage';
 import StatisticsPage from '../Student/StatisticsPage';
+import MyCourses from '../Student/MyCourses';
 
 const StudentDashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -17,6 +18,8 @@ const StudentDashboard = () => {
     switch (pathname) {
       case '/student/attendance':
         return 'Give Attendance';
+      case '/student/courses':
+        return 'My Courses';
       case '/student/statistics':
         return 'Attendance Statistics';
       default:
@@ -38,6 +41,7 @@ const StudentDashboard = () => {
           <Routes>
             <Route path="/" element={<StudentOverview />} />
             <Route path="/attendance" element={<AttendancePage />} />
+            <Route path="/courses" element={<MyCourses />} />
             <Route path="/statistics" element={<StatisticsPage />} />
           </Routes>
         </div>

@@ -2,30 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext();
 
-// Mock users for demonstration
-const mockUsers = [
-  {
-    id: '1',
-    username: 'student1',
-    role: 'STUDENT',
-    name: 'John Student',
-    email: 'john.student@university.edu'
-  },
-  {
-    id: '2',
-    username: 'teacher1',
-    role: 'TEACHER',
-    name: 'Dr. Jane Teacher',
-    email: 'jane.teacher@university.edu'
-  },
-  {
-    id: '3',
-    username: 'admin1',
-    role: 'admin',
-    name: 'Admin User',
-    email: 'admin@university.edu'
-  }
-];
+// No mock users - all authentication goes through backend API
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -73,26 +50,9 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('attendanceToken', data.token);
         setIsLoading(false);
         return true;
-      } else {
-        // Fallback to mock users for demo
-        const foundUser = mockUsers.find(u => u.username === username);
-        if (foundUser && password === 'password') {
-          setUser(foundUser);
-          localStorage.setItem('attendanceUser', JSON.stringify(foundUser));
-          setIsLoading(false);
-          return true;
-        }
       }
     } catch (error) {
       console.error('Login error:', error);
-      // Fallback to mock users for demo
-      const foundUser = mockUsers.find(u => u.username === username);
-      if (foundUser && password === 'password') {
-        setUser(foundUser);
-        localStorage.setItem('attendanceUser', JSON.stringify(foundUser));
-        setIsLoading(false);
-        return true;
-      }
     }
     
     setIsLoading(false);

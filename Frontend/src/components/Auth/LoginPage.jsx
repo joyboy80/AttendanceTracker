@@ -108,19 +108,6 @@ const LoginPage = () => {
               </Link>
             </p>
           </div>
-          
-          <div className="mt-3">
-            <div className="card bg-light">
-              <div className="card-body">
-                <h6 className="card-title">Demo Accounts</h6>
-                <small className="text-muted">
-                  <strong>Student:</strong> student1 / password<br/>
-                  <strong>Teacher:</strong> teacher1 / password<br/>
-                  <strong>Admin:</strong> admin1 / password
-                </small>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>

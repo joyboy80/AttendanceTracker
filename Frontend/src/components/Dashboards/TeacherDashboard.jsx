@@ -1,24 +1,32 @@
 import React, { useState } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import Sidebar from '../Layout/Sidebar';
 import Header from '../Layout/Header';
 import TeacherOverview from '../Teacher/TeacherOverview';
-import ActivateAttendance from '../Teacher/ActivateAttendance';
 import TeacherStatistics from '../Teacher/TeacherStatistics';
+import ActivateAttendance from '../Teacher/ActivateAttendance';
+import AssignedCourses from '../Teacher/AssignedCourses.tsx';
 
 const TeacherDashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const location = useLocation();
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
   };
 
-  const getPageTitle = (pathname) => {
-    switch (pathname) {
+  const getPageTitle = () => {
+    switch (location.pathname) {
+      case '/teacher':
+        return 'Teacher Dashboard';
+      case '/teacher/overview':
+        return 'Overview';
+      case '/teacher/statistics':
+        return 'Statistics';
       case '/teacher/activate':
         return 'Activate Attendance';
-      case '/teacher/statistics':
-        return 'Teaching Statistics';
+      case '/teacher/courses':
+        return 'Assigned Courses';
       default:
         return 'Teacher Dashboard';
     }
@@ -31,7 +39,7 @@ const TeacherDashboard = () => {
       <div className="main-content" style={{ marginLeft: window.innerWidth >= 768 ? '250px' : '0' }}>
         <Header 
           toggleSidebar={toggleSidebar} 
-          title={getPageTitle(window.location.pathname)}
+          title={getPageTitle()}
         />
         
         <div className="container-fluid">
@@ -39,6 +47,7 @@ const TeacherDashboard = () => {
             <Route path="/" element={<TeacherOverview />} />
             <Route path="/activate" element={<ActivateAttendance />} />
             <Route path="/statistics" element={<TeacherStatistics />} />
+            <Route path="/courses" element={<AssignedCourses />} />
           </Routes>
         </div>
       </div>

@@ -98,7 +98,49 @@ const TeacherOverview = () => {
               <i className="fas fa-qrcode fa-3x text-primary mb-3"></i>
               <h5>Generate Code</h5>
               <p className="text-muted">Create attendance code for current class</p>
-              <button className="btn btn-primary">
+              <button className="btn btn-primary" onClick={async () => {
+                try {
+                  const token = localStorage.getItem('attendanceToken');
+                  console.log('Token:', token); // Debug log
+                  if (!token) {
+                    alert('Please log in first');
+                    return;
+                  }
+                  
+                  // Get teacher information from stored user data
+                  const storedUser = localStorage.getItem('attendanceUser');
+                  if (!storedUser) {
+                    alert('User information not found. Please log in again.');
+                    return;
+                  }
+                  
+                  const userData = JSON.parse(storedUser);
+                  const teacherName = userData.name || 'Unknown Teacher';
+                  const teacherUsername = userData.username || 'unknown';
+                  
+                  const res = await fetch(`http://localhost:8080/api/attendance/generate?courseCode=CS101&teacherName=${encodeURIComponent(teacherName)}&teacherUsername=${encodeURIComponent(teacherUsername)}`, { 
+                    method: 'POST',
+                    headers: {
+                      'Authorization': `Bearer ${token}`,
+                      'Content-Type': 'application/json'
+                    }
+                  });
+                  console.log('Response status:', res.status); // Debug log
+                  const data = await res.json();
+                  console.log('Response data:', data); // Debug log
+                  if (res.ok) {
+                    // Store code and session in localStorage for Activate page
+                    localStorage.setItem('activeAttendanceCode', data.code);
+                    localStorage.setItem('activeAttendanceSessionId', String(data.sessionId));
+                    window.location.href = '/teacher/activate';
+                  } else {
+                    alert('Failed to generate code: ' + (data.message || 'Unknown error'));
+                  }
+                } catch (e) {
+                  console.error('Error:', e); // Debug log
+                  alert('Network error: ' + e.message);
+                }
+              }}>
                 <i className="fas fa-key me-2"></i>Generate
               </button>
             </div>
