@@ -1,7 +1,55 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import StatsCard from '../Common/StatsCard';
 
+interface Course {
+  id: number;
+  code: string;
+  title: string;
+  credit: number;
+  description?: string;
+}
+
 const TeacherOverview = () => {
+  const [assignedCourses, setAssignedCourses] = useState<Course[]>([]);
+  const [coursesLoading, setCoursesLoading] = useState(true);
+  const [coursesError, setCoursesError] = useState('');
+
+  useEffect(() => {
+    fetchAssignedCourses();
+  }, []);
+
+  const fetchAssignedCourses = async () => {
+    try {
+      setCoursesLoading(true);
+      const token = localStorage.getItem('attendanceToken');
+      
+      if (!token) {
+        setCoursesError('Authentication required');
+        setCoursesLoading(false);
+        return;
+      }
+
+      const response = await fetch('http://localhost:8080/api/teacher/courses', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setAssignedCourses(data);
+        setCoursesError('');
+      } else {
+        const errorData = await response.json();
+        setCoursesError(errorData.error || 'Failed to fetch assigned courses');
+      }
+    } catch (err: any) {
+      setCoursesError('Error fetching courses: ' + err.message);
+    } finally {
+      setCoursesLoading(false);
+    }
+  };
   const teachingSchedule = [
     { day: 'Monday', time: '9:00 AM - 11:00 AM', subject: 'Computer Science 101', room: 'Room 101', students: 35 },
     { day: 'Tuesday', time: '10:00 AM - 12:00 PM', subject: 'Data Structures', room: 'Lab 1', students: 28 },
@@ -16,10 +64,11 @@ const TeacherOverview = () => {
       <div className="row mb-4">
         <div className="col-md-3 mb-3">
           <StatsCard
-            title="Total Students"
-            value="95"
-            icon="fas fa-user-graduate"
+            title="Total Courses"
+            value={assignedCourses.length.toString()}
+            icon="fas fa-book"
             color="primary"
+            trend={{ value: 0, isPositive: true }}
           />
         </div>
         <div className="col-md-3 mb-3">
@@ -28,6 +77,7 @@ const TeacherOverview = () => {
             value="5"
             icon="fas fa-chalkboard-teacher"
             color="success"
+            trend={{ value: 0, isPositive: true }}
           />
         </div>
         <div className="col-md-3 mb-3">
@@ -45,7 +95,102 @@ const TeacherOverview = () => {
             value="2"
             icon="fas fa-calendar-day"
             color="warning"
+            trend={{ value: 0, isPositive: true }}
           />
+        </div>
+      </div>
+
+      {/* Assigned Courses Section */}
+      <div className="card mb-4">
+        <div className="card-header">
+          <div className="d-flex justify-content-between align-items-center">
+            <h5><i className="fas fa-graduation-cap me-2"></i>My Assigned Courses</h5>
+            {assignedCourses.length > 0 && (
+              <span className="badge bg-primary">
+                {assignedCourses.length} course{assignedCourses.length !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="card-body">
+          {coursesLoading ? (
+            <div className="text-center py-3">
+              <div className="spinner-border text-primary" role="status">
+                <span className="visually-hidden">Loading...</span>
+              </div>
+              <p className="mt-2 text-muted">Loading your assigned courses...</p>
+            </div>
+          ) : coursesError ? (
+            <div className="alert alert-danger">
+              <i className="fas fa-exclamation-triangle me-2"></i>
+              {coursesError}
+            </div>
+          ) : assignedCourses.length === 0 ? (
+            <div className="text-center py-4">
+              <i className="fas fa-book fa-3x text-muted mb-3"></i>
+              <h6 className="text-muted">No Assigned Courses</h6>
+              <p className="text-muted mb-0">Contact your administrator to get course assignments.</p>
+            </div>
+          ) : (
+            <div className="table-responsive">
+              <table className="table table-hover mb-0">
+                <thead>
+                  <tr>
+                    <th>Course Code</th>
+                    <th>Course Title</th>
+                    <th>Credits</th>
+                    <th>Description</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {assignedCourses.map((course) => (
+                    <tr key={course.id}>
+                      <td>
+                        <span className="badge bg-primary fs-6">{course.code}</span>
+                      </td>
+                      <td className="fw-semibold">{course.title}</td>
+                      <td>
+                        <span className="badge bg-success">{course.credit} credit{course.credit !== 1 ? 's' : ''}</span>
+                      </td>
+                      <td className="text-muted">
+                        {course.description ? 
+                          (course.description.length > 50 ? 
+                            course.description.substring(0, 50) + '...' : 
+                            course.description
+                          ) : '-'
+                        }
+                      </td>
+                      <td>
+                        <div className="btn-group btn-group-sm">
+                          <button 
+                            className="btn btn-outline-primary"
+                            onClick={() => {
+                              // Future: Navigate to attendance management
+                              alert(`Manage attendance for ${course.code}`);
+                            }}
+                          >
+                            <i className="fas fa-user-check me-1"></i>
+                            Attendance
+                          </button>
+                          <button 
+                            className="btn btn-outline-info"
+                            onClick={() => {
+                              // Future: Navigate to course details
+                              window.location.href = '/teacher/courses';
+                            }}
+                          >
+                            <i className="fas fa-eye me-1"></i>
+                            Details
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
 
@@ -136,9 +281,9 @@ const TeacherOverview = () => {
                   } else {
                     alert('Failed to generate code: ' + (data.message || 'Unknown error'));
                   }
-                } catch (e) {
+                } catch (e: unknown) {
                   console.error('Error:', e); // Debug log
-                  alert('Network error: ' + e.message);
+                  alert('Network error: ' + (e as Error).message);
                 }
               }}>
                 <i className="fas fa-key me-2"></i>Generate

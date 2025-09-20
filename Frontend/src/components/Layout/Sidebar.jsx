@@ -21,6 +21,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         return [
           { path: '/teacher', icon: 'fas fa-tachometer-alt', label: 'Dashboard' },
           { path: '/teacher/activate', icon: 'fas fa-play-circle', label: 'Activate Attendance' },
+          { path: '/teacher/courses', icon: 'fas fa-graduation-cap', label: 'My Assigned Courses' },
           { path: '/teacher/statistics', icon: 'fas fa-chart-line', label: 'Statistics' },
         ];
       case 'ADMIN':
