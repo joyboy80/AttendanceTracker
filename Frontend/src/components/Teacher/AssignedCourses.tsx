@@ -54,6 +54,54 @@ const AssignedCourses = () => {
     return courses.reduce((total, course) => total + course.credit, 0);
   };
 
+  const handleGenerateAttendanceCode = async (course: Course) => {
+    try {
+      const token = localStorage.getItem('attendanceToken');
+      if (!token) {
+        alert('Please log in first');
+        return;
+      }
+      
+      // Get teacher information from stored user data
+      const storedUser = localStorage.getItem('attendanceUser');
+      if (!storedUser) {
+        alert('User information not found. Please log in again.');
+        return;
+      }
+      
+      const userData = JSON.parse(storedUser);
+      const teacherName = userData.name || 'Unknown Teacher';
+      const teacherUsername = userData.username || 'unknown';
+      
+      const response = await fetch(`http://localhost:8080/api/attendance/generate?courseCode=${encodeURIComponent(course.code)}&teacherName=${encodeURIComponent(teacherName)}&teacherUsername=${encodeURIComponent(teacherUsername)}`, { 
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        // Store code and session in localStorage for Activate page
+        localStorage.setItem('activeAttendanceCode', data.code);
+        localStorage.setItem('activeAttendanceSessionId', String(data.sessionId));
+        localStorage.setItem('activeCourseCode', course.code);
+        localStorage.setItem('activeCourseTitle', course.title);
+        
+        // Show success message and redirect to activate page
+        alert(`Attendance code generated successfully for ${course.code}!\nRedirecting to Active Attendance page...`);
+        window.location.href = '/teacher/activate';
+      } else {
+        alert('Failed to generate attendance code: ' + (data.message || 'Unknown error'));
+      }
+    } catch (error: unknown) {
+      console.error('Error generating attendance code:', error);
+      alert('Network error: ' + (error as Error).message);
+    }
+  };
+
   if (loading) {
     return (
       <div className="card">
@@ -178,13 +226,10 @@ const AssignedCourses = () => {
                       </small>
                       <div className="btn-group btn-group-sm">
                         <button 
-                          className="btn btn-outline-success btn-sm"
-                          onClick={() => {
-                            // Future: Navigate to attendance management for this course
-                            alert(`Manage attendance for ${course.code}`);
-                          }}
+                          className="btn btn-success btn-sm"
+                          onClick={() => handleGenerateAttendanceCode(course)}
                         >
-                          <i className="fas fa-user-check me-1"></i>
+                          <i className="fas fa-qrcode me-1"></i>
                           Attendance
                         </button>
                         <button 
@@ -194,7 +239,7 @@ const AssignedCourses = () => {
                             alert(`View details for ${course.code}`);
                           }}
                         >
-                          <i className="fas fa-eye me-1"></i>
+                          <i className="fas fa-info-circle me-1"></i>
                           Details
                         </button>
                       </div>

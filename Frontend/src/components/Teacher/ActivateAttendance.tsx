@@ -14,8 +14,12 @@ const ActivateAttendance = () => {
   const [sessionStats, setSessionStats] = useState<any>(null);
 
   useEffect(() => {
+    // Load dynamic course information from localStorage
+    const activeCourseCode = localStorage.getItem('activeCourseCode') || 'Unknown Course';
+    const activeCourseTitle = localStorage.getItem('activeCourseTitle') || 'Unknown Title';
+    
     const mockClass = {
-      subject: 'Computer Science 101',
+      subject: `${activeCourseCode} - ${activeCourseTitle}`,
       room: 'Room 101',
       time: '9:00 AM - 11:00 AM',
       totalStudents: 35,
