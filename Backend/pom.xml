@@ -9,10 +9,10 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.SmartAttandence</groupId>
-    <artifactId>CUET</artifactId>
+    <artifactId>smart-biometric-attendance-tracker</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>CUET</name>
-    <description>Demo project for Spring Boot</description>
+    <name>Smart Biometric Attendance Tracker</name>
+    <description>Smart Biometric Attendance Tracker System with React frontend and Spring Boot backend</description>
     <url/>
     <licenses>
         <license/>

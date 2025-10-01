@@ -42,6 +42,7 @@ export const AuthProvider = ({ children }) => {
           role: data.user.role,
           name: data.user.name,
           email: data.user.email,
+          batch: data.user.batch, // Include batch information
           token: data.token
         };
         

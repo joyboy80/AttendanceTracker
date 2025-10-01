@@ -6,6 +6,7 @@ import StudentOverview from '../Student/StudentOverview';
 import AttendancePage from '../Student/AttendancePage';
 import StatisticsPage from '../Student/StatisticsPage';
 import MyCourses from '../Student/MyCourses';
+import MySchedule from '../Student/MySchedule';
 
 const StudentDashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -20,6 +21,8 @@ const StudentDashboard = () => {
         return 'Give Attendance';
       case '/student/courses':
         return 'My Courses';
+      case '/student/schedule':
+        return 'My Schedule';
       case '/student/statistics':
         return 'Attendance Statistics';
       default:
@@ -42,6 +45,7 @@ const StudentDashboard = () => {
             <Route path="/" element={<StudentOverview />} />
             <Route path="/attendance" element={<AttendancePage />} />
             <Route path="/courses" element={<MyCourses />} />
+            <Route path="/schedule" element={<MySchedule />} />
             <Route path="/statistics" element={<StatisticsPage />} />
           </Routes>
         </div>

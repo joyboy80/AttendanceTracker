@@ -3,7 +3,7 @@ server:
 
 spring:
   application:
-    name: attendance-tracker
+    name: smart-biometric-attendance-tracker
   
   config:
     import: optional:file:.env[.properties]

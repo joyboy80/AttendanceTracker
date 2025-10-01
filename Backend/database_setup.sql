@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS attendance (
     studentID BIGINT NOT NULL,
     courseCode VARCHAR(20) NOT NULL,
     sessionID BIGINT NOT NULL,
+    attendance_code VARCHAR(255) NOT NULL,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     biometric_verified BOOLEAN DEFAULT FALSE,
     location_verified BOOLEAN DEFAULT FALSE,
@@ -133,34 +134,28 @@ CREATE TABLE IF NOT EXISTS student_course_enrollment (
     UNIQUE KEY unique_student_course (studentID, courseCode)
 );
 
--- Create class_sessions table
-CREATE TABLE IF NOT EXISTS class_sessions (
-    sessionID BIGINT AUTO_INCREMENT PRIMARY KEY,
-    courseCode VARCHAR(20),
-    scheduled_time TIMESTAMP,
-    duration INT,
-    access_code VARCHAR(255),
-    expiry_time TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (courseCode) REFERENCES courses(courseCode) ON DELETE CASCADE
-);
+-- Add missing columns to existing class_sessions table
+ALTER TABLE class_sessions 
+ADD COLUMN IF NOT EXISTS status ENUM('ACTIVE', 'ENDED', 'PAUSED') DEFAULT 'ACTIVE',
+ADD COLUMN IF NOT EXISTS end_time TIMESTAMP NULL,
+ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE,
+ADD COLUMN IF NOT EXISTS remaining_time INT DEFAULT 0,
+ADD COLUMN IF NOT EXISTS teacher_name VARCHAR(100),
+ADD COLUMN IF NOT EXISTS teacher_username VARCHAR(50);
 
--- Create attendance table
-CREATE TABLE IF NOT EXISTS attendance (
-    attendanceID BIGINT AUTO_INCREMENT PRIMARY KEY,
-    studentID BIGINT NOT NULL,
-    courseCode VARCHAR(20),
-    sessionID BIGINT,
-    attendance_code VARCHAR(255) NOT NULL,
-    timestamp TIMESTAMP NOT NULL,
-    status VARCHAR(20) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY unique_student_session (studentID, sessionID),
-    FOREIGN KEY (studentID) REFERENCES students(studentID) ON DELETE CASCADE,
-    FOREIGN KEY (courseCode) REFERENCES courses(courseCode) ON DELETE CASCADE,
-    FOREIGN KEY (sessionID) REFERENCES class_sessions(sessionID) ON DELETE CASCADE
-);
+-- Update existing attendance table to match expected schema
+ALTER TABLE attendance 
+MODIFY COLUMN status ENUM('PRESENT', 'ABSENT', 'LATE') NOT NULL DEFAULT 'PRESENT',
+ADD COLUMN IF NOT EXISTS attendance_code VARCHAR(255),
+ADD COLUMN IF NOT EXISTS biometric_verified BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS location_verified BOOLEAN DEFAULT FALSE;
+
+-- Add performance indexes for attendance queries
+CREATE INDEX IF NOT EXISTS idx_attendance_student_session ON attendance(studentID, sessionID);
+CREATE INDEX IF NOT EXISTS idx_attendance_session ON attendance(sessionID);
+CREATE INDEX IF NOT EXISTS idx_attendance_code ON attendance(attendance_code);
+CREATE INDEX IF NOT EXISTS idx_class_sessions_course_active ON class_sessions(courseCode, is_active, status);
+CREATE INDEX IF NOT EXISTS idx_class_sessions_access_code ON class_sessions(access_code);
 
 -- Database schema created. No sample data included.
 -- Users must be created through the signup process.

@@ -2,14 +2,6 @@ import React from 'react';
 import StatsCard from '../Common/StatsCard';
 
 const TeacherOverview = () => {
-  const teachingSchedule = [
-    { day: 'Monday', time: '9:00 AM - 11:00 AM', subject: 'Computer Science 101', room: 'Room 101', students: 35 },
-    { day: 'Tuesday', time: '10:00 AM - 12:00 PM', subject: 'Data Structures', room: 'Lab 1', students: 28 },
-    { day: 'Wednesday', time: '9:00 AM - 11:00 AM', subject: 'Computer Science 101', room: 'Room 101', students: 35 },
-    { day: 'Thursday', time: '2:00 PM - 4:00 PM', subject: 'Algorithms', room: 'Room 203', students: 32 },
-    { day: 'Friday', time: '10:00 AM - 12:00 PM', subject: 'Data Structures', room: 'Lab 1', students: 28 },
-  ];
-
   return (
     <div className="fade-in">
       {/* Stats Cards */}
@@ -49,47 +41,6 @@ const TeacherOverview = () => {
             color="warning"
             trend={{ value: 0, isPositive: true }}
           />
-        </div>
-      </div>
-
-      {/* Teaching Schedule */}
-      <div className="card">
-        <div className="card-header">
-          <h5><i className="fas fa-calendar-alt me-2"></i>Weekly Teaching Schedule</h5>
-        </div>
-        <div className="card-body">
-          <div className="table-responsive">
-            <table className="table table-hover">
-              <thead>
-                <tr>
-                  <th>Day</th>
-                  <th>Time</th>
-                  <th>Subject</th>
-                  <th>Room</th>
-                  <th>Students</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {teachingSchedule.map((schedule, index) => (
-                  <tr key={index}>
-                    <td className="fw-semibold">{schedule.day}</td>
-                    <td>{schedule.time}</td>
-                    <td>{schedule.subject}</td>
-                    <td>{schedule.room}</td>
-                    <td>
-                      <span className="badge bg-light text-dark">{schedule.students}</span>
-                    </td>
-                    <td>
-                      <button className="btn btn-sm btn-outline-primary">
-                        <i className="fas fa-play me-1"></i>Start Class
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
         </div>
       </div>
 

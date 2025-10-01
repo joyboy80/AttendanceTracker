@@ -174,15 +174,6 @@ const AdminOverview = () => {
                 <button className="btn btn-outline-primary">
                   <i className="fas fa-user-plus me-2"></i>Add User
                 </button>
-                <button className="btn btn-outline-success">
-                  <i className="fas fa-upload me-2"></i>Upload Routine
-                </button>
-                <button className="btn btn-outline-info">
-                  <i className="fas fa-download me-2"></i>Export Data
-                </button>
-                <button className="btn btn-outline-warning">
-                  <i className="fas fa-bell me-2"></i>Send Alerts
-                </button>
               </div>
             </div>
           </div>

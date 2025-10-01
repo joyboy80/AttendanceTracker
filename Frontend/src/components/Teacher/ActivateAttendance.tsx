@@ -57,10 +57,17 @@ const ActivateAttendance = () => {
           localStorage.setItem('activeAttendanceCode', session.accessCode);
           localStorage.setItem('activeAttendanceSessionId', String(session.sessionID));
           checkSessionStatus(session.sessionID);
+          loadAttendees(session.sessionID);
+          loadSessionStatistics(session.sessionID);
+        } else {
+          // No active session found, generate a new one automatically
+          generateCode();
         }
       }
     } catch (e) {
       console.error('Error checking active session:', e);
+      // If there's an error, generate a new session as fallback
+      generateCode();
     }
   };
 
@@ -182,14 +189,37 @@ const ActivateAttendance = () => {
     }
   }, [isActive, sessionAbsoluteEndTime, isPaused]);
 
-  const generateCode = () => {
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    setAttendanceCode(code);
+  const generateCode = async () => {
+    try {
+      const token = localStorage.getItem('attendanceToken');
+      const user = JSON.parse(localStorage.getItem('attendanceUser') || '{}');
+      
+      const res = await fetch(`http://localhost:8080/api/attendance/generate?courseCode=CS101&teacherName=${encodeURIComponent(user.firstName + ' ' + user.lastName)}&teacherUsername=${encodeURIComponent(user.username)}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setAttendanceCode(data.accessCode);
+        localStorage.setItem('activeAttendanceCode', data.accessCode);
+        localStorage.setItem('activeAttendanceSessionId', String(data.sessionId));
+        
+        // Load attendees immediately after generating code
+        loadAttendees(data.sessionId);
+        loadSessionStatistics(data.sessionId);
+      } else {
+        alert('Failed to generate attendance code');
+      }
+    } catch (e) {
+      alert('Error generating code: ' + e.message);
+    }
   };
 
   const startAttendance = async () => {
     if (!attendanceCode) {
-      generateCode();
+      alert('Please generate a code first');
+      return;
     }
     try {
       const token = localStorage.getItem('attendanceToken');

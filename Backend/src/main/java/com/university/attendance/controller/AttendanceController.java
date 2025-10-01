@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/attendance")
@@ -134,6 +135,75 @@ public class AttendanceController {
     @GetMapping("/session-statistics")
     public ResponseEntity<Map<String, Object>> getSessionStatistics(@RequestParam Long sessionId) {
         return ResponseEntity.ok(attendanceService.getSessionStatistics(sessionId));
+    }
+    
+    @GetMapping("/debug-sessions")
+    public ResponseEntity<Map<String, Object>> debugSessions(@RequestParam String courseCode) {
+        Map<String, Object> debug = new HashMap<>();
+        
+        debug.put("courseCode", courseCode);
+        debug.put("currentTime", java.time.Instant.now());
+        
+        // Get what the active session query returns
+        Optional<ClassSession> activeSession = attendanceService.getActiveSession(courseCode);
+        debug.put("activeSessionFound", activeSession.isPresent());
+        if (activeSession.isPresent()) {
+            ClassSession session = activeSession.get();
+            debug.put("activeSession", Map.of(
+                "sessionID", session.getSessionID(),
+                "status", session.getStatus(),
+                "isActive", session.getIsActive(),
+                "expiryTime", session.getExpiryTime(),
+                "teacherName", session.getTeacherName(),
+                "accessCode", session.getAccessCode()
+            ));
+            
+            // Also check attendees for this session
+            List<Map<String, Object>> attendees = attendanceService.getAttendeesWithDetails(session.getSessionID());
+            debug.put("attendeesCount", attendees.size());
+            debug.put("attendees", attendees);
+        }
+        
+        return ResponseEntity.ok(debug);
+    }
+    
+    @PostMapping("/test-flow")
+    public ResponseEntity<Map<String, Object>> testCompleteFlow(@RequestParam String teacherName, 
+                                                               @RequestParam String teacherUsername) {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            // Step 1: Generate code
+            GenerateCodeResponse codeResponse = attendanceService.generateCode("CS101", teacherName, teacherUsername);
+            result.put("step1_generate", Map.of(
+                "success", true,
+                "sessionId", codeResponse.getSessionId(),
+                "accessCode", codeResponse.getCode()
+            ));
+            
+            // Step 2: Start attendance
+            ClassSession session = attendanceService.startAttendance(codeResponse.getSessionId(), 120);
+            result.put("step2_start", Map.of(
+                "success", true,
+                "expiryTime", session.getExpiryTime(),
+                "isActive", session.getIsActive()
+            ));
+            
+            // Step 3: Check if students can detect
+            Optional<com.university.attendance.dto.StudentSessionResponse> studentSession = 
+                attendanceService.getCurrentActiveSessionForStudent("CS101");
+            result.put("step3_student_detection", Map.of(
+                "success", studentSession.isPresent(),
+                "sessionFound", studentSession.isPresent()
+            ));
+            
+            result.put("overall", "SUCCESS - Complete flow working");
+            
+        } catch (Exception e) {
+            result.put("error", e.getMessage());
+            result.put("overall", "FAILED");
+        }
+        
+        return ResponseEntity.ok(result);
     }
 }
 

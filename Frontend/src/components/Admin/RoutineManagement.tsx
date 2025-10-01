@@ -1,368 +1,560 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+
+interface Routine {
+  routineId: number;
+  courseId: number;
+  courseCode: string;
+  courseTitle: string;
+  courseTime: string;
+  endTime: string;
+  day: string;
+  teacherId: number;
+  teacherName: string;
+  teacherUsername: string;
+  studentBatch: string;
+  createdAt: string;
+}
+
+interface Teacher {
+  id: number;
+  username: string;
+  name: string;
+  email: string;
+}
 
 const RoutineManagement = () => {
-  const [routines, setRoutines] = useState([
-    { id: 1, day: 'Monday', time: '9:00 AM - 11:00 AM', subject: 'Computer Science', teacher: 'Dr. Smith', room: 'Room 101' },
-    { id: 2, day: 'Monday', time: '2:00 PM - 4:00 PM', subject: 'Mathematics', teacher: 'Prof. Johnson', room: 'Room 203' },
-    { id: 3, day: 'Tuesday', time: '10:00 AM - 12:00 PM', subject: 'Physics', teacher: 'Dr. Wilson', room: 'Lab 1' },
-    { id: 4, day: 'Wednesday', time: '9:00 AM - 11:00 AM', subject: 'Chemistry', teacher: 'Prof. Davis', room: 'Lab 2' },
-  ]);
-
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [editingRoutine, setEditingRoutine] = useState(null);
-  const [csvFile, setCsvFile] = useState(null);
-  
+  const [routines, setRoutines] = useState<Routine[]>([]);
+  const [showModal, setShowModal] = useState(false);
+  const [selectedBatch, setSelectedBatch] = useState('');
+  const [batches, setBatches] = useState<string[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [courses, setCourses] = useState<any[]>([]);
+  const [teacherCourses, setTeacherCourses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [teachersLoading, setTeachersLoading] = useState(false);
+  const [coursesLoading, setCoursesLoading] = useState(false);
   const [formData, setFormData] = useState({
     day: 'Monday',
     time: '',
-    subject: '',
-    teacher: '',
-    room: ''
+    endTime: '',
+    courseId: '',
+    batch: '',
+    teacherId: ''
   });
 
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-  const handleAddRoutine = () => {
-    const newRoutine = {
-      id: routines.length + 1,
-      ...formData
-    };
-    setRoutines([...routines, newRoutine]);
-    setFormData({ day: 'Monday', time: '', subject: '', teacher: '', room: '' });
-    setShowAddModal(false);
-  };
+  useEffect(() => {
+    fetchStudentBatches();
+    fetchTeachers();
+    fetchCourses();
+    fetchRoutines();
+  }, []);
 
-  const handleEditRoutine = (routine) => {
-    setEditingRoutine(routine);
-    setFormData({
-      day: routine.day,
-      time: routine.time,
-      subject: routine.subject,
-      teacher: routine.teacher,
-      room: routine.room
-    });
-    setShowAddModal(true);
-  };
-
-  const handleUpdateRoutine = () => {
-    setRoutines(routines.map(routine => 
-      routine.id === editingRoutine.id ? { ...editingRoutine, ...formData } : routine
-    ));
-    setFormData({ day: 'Monday', time: '', subject: '', teacher: '', room: '' });
-    setEditingRoutine(null);
-    setShowAddModal(false);
-  };
-
-  const handleDeleteRoutine = (routineId) => {
-    if (window.confirm('Are you sure you want to delete this routine?')) {
-      setRoutines(routines.filter(routine => routine.id !== routineId));
-    }
-  };
-
-  const handleCSVUpload = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      setCsvFile(file);
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const csvContent = e.target.result;
-          const lines = csvContent.split('\n');
-          const headers = lines[0].split(',');
-          
-          const newRoutines = lines.slice(1).filter(line => line.trim()).map((line, index) => {
-            const values = line.split(',');
-            return {
-              id: routines.length + index + 1,
-              day: values[0]?.trim() || '',
-              time: values[1]?.trim() || '',
-              subject: values[2]?.trim() || '',
-              teacher: values[3]?.trim() || '',
-              room: values[4]?.trim() || ''
-            };
-          });
-          
-          setRoutines([...routines, ...newRoutines]);
-          alert('CSV uploaded successfully!');
-        } catch (error) {
-          alert('Error processing CSV file. Please check the format.');
+  const fetchCourses = async () => {
+    setCoursesLoading(true);
+    try {
+      const token = localStorage.getItem('attendanceToken');
+      const response = await fetch('http://localhost:8080/api/admin/courses', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
-      };
-      reader.readAsText(file);
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setCourses(data || []);
+      } else {
+        console.error('Failed to fetch courses');
+        setCourses([]);
+      }
+    } catch (error) {
+      console.error('Error fetching courses:', error);
+      setCourses([]);
+    } finally {
+      setCoursesLoading(false);
     }
   };
 
-  const downloadTemplate = () => {
-    const csvContent = 'Day,Time,Subject,Teacher,Room\nMonday,9:00 AM - 11:00 AM,Sample Subject,Sample Teacher,Room 101';
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'routine_template.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
+  const fetchTeacherCourses = async (teacherId: string) => {
+    if (!teacherId) {
+      setTeacherCourses([]);
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('attendanceToken');
+      const response = await fetch(`http://localhost:8080/api/admin/courses/teacher/${teacherId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setTeacherCourses(data.courses || []);
+      } else {
+        console.error('Failed to fetch teacher courses');
+        setTeacherCourses([]);
+      }
+    } catch (error) {
+      console.error('Error fetching teacher courses:', error);
+      setTeacherCourses([]);
+    }
   };
 
-  const exportRoutines = () => {
-    const csvContent = [
-      ['Day', 'Time', 'Subject', 'Teacher', 'Room'],
-      ...routines.map(routine => [routine.day, routine.time, routine.subject, routine.teacher, routine.room])
-    ].map(row => row.join(',')).join('\n');
+  const fetchRoutines = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('attendanceToken');
+      const response = await fetch('http://localhost:8080/api/admin/routines', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
 
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `routines_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Fetched routines data:', data); // Debug log
+        if (data.success) {
+          // Map the response to match frontend interface
+          const mappedRoutines = (data.routines || []).map((routine: any) => ({
+            routineId: routine.routineId,
+            courseId: routine.courseId,
+            courseCode: routine.courseCode,
+            courseTitle: routine.courseTitle,
+            courseTime: typeof routine.courseTime === 'string' ? routine.courseTime : routine.courseTime.toString(),
+            endTime: typeof routine.endTime === 'string' ? routine.endTime : routine.endTime.toString(),
+            day: routine.day,
+            teacherId: routine.teacherId,
+            teacherName: routine.teacherName,
+            teacherUsername: routine.teacherUsername,
+            studentBatch: routine.studentBatch,
+            createdAt: routine.createdAt
+          }));
+          console.log('Mapped routines:', mappedRoutines); // Debug log
+          setRoutines(mappedRoutines);
+        } else {
+          console.error('API returned success: false', data);
+        }
+      } else {
+        console.error('Failed to fetch routines, status:', response.status);
+        const errorData = await response.text();
+        console.error('Error response:', errorData);
+      }
+    } catch (error) {
+      console.error('Error fetching routines:', error);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const fetchStudentBatches = async () => {
+    setLoading(true);
+    try {
+      // Generate batch numbers from 20 to 29
+      const generatedBatches = [];
+      for (let i = 20; i <= 29; i++) {
+        generatedBatches.push(i.toString());
+      }
+      setBatches(generatedBatches);
+    } catch (error) {
+      console.error('Error generating student batches:', error);
+      // Fallback to hardcoded batch numbers if something goes wrong
+      setBatches(['20', '21', '22', '23', '24', '25', '26', '27', '28', '29']);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchTeachers = async () => {
+    setTeachersLoading(true);
+    try {
+      const token = localStorage.getItem('attendanceToken');
+      const response = await fetch('http://localhost:8080/api/admin/teachers', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setTeachers(data.teachers || []);
+      } else {
+        console.error('Failed to fetch teachers');
+        // Fallback to hardcoded teachers if API fails
+        setTeachers([
+          { id: 1, username: 'dr_smith', name: 'Dr. Smith', email: 'smith@university.edu' },
+          { id: 2, username: 'prof_johnson', name: 'Prof. Johnson', email: 'johnson@university.edu' },
+          { id: 3, username: 'dr_wilson', name: 'Dr. Wilson', email: 'wilson@university.edu' },
+          { id: 4, username: 'prof_davis', name: 'Prof. Davis', email: 'davis@university.edu' }
+        ]);
+      }
+    } catch (error) {
+      console.error('Error fetching teachers:', error);
+      // Fallback to hardcoded teachers if API fails
+      setTeachers([
+        { id: 1, username: 'dr_smith', name: 'Dr. Smith', email: 'smith@university.edu' },
+        { id: 2, username: 'prof_johnson', name: 'Prof. Johnson', email: 'johnson@university.edu' },
+        { id: 3, username: 'dr_wilson', name: 'Dr. Wilson', email: 'wilson@university.edu' },
+        { id: 4, username: 'prof_davis', name: 'Prof. Davis', email: 'davis@university.edu' }
+      ]);
+    } finally {
+      setTeachersLoading(false);
+    }
+  };
+
+  const getAvailableCourses = () => {
+    // Return courses assigned to the selected teacher
+    return teacherCourses;
+  };
+
+  const addRoutine = async () => {
+    if (!formData.courseId || !formData.time || !formData.endTime || !formData.batch || !formData.teacherId) {
+      alert('Please fill all fields');
+      return;
+    }
+
+    // Validate that end time is after start time
+    if (formData.endTime <= formData.time) {
+      alert('End time must be after start time');
+      return;
+    }
+
+    // Validate that the selected course is assigned to the selected teacher
+    const isValidCourseTeacherMatch = teacherCourses.some(course => 
+      course.id.toString() === formData.courseId
+    );
+
+    if (!isValidCourseTeacherMatch) {
+      alert('Selected course is not assigned to the selected teacher. Please choose a valid course-teacher combination.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('attendanceToken');
+      
+      // Get teacher username for the API call
+      const selectedTeacher = teachers.find(t => t.id.toString() === formData.teacherId);
+      if (!selectedTeacher) {
+        alert('Selected teacher not found');
+        return;
+      }
+
+      const routineData = {
+        courseId: parseInt(formData.courseId),
+        courseTime: formData.time,
+        endTime: formData.endTime,
+        day: formData.day,
+        username: selectedTeacher.username,
+        studentBatch: formData.batch
+      };
+
+      const response = await fetch('http://localhost:8080/api/routine', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(routineData)
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Add routine response:', data); // Debug log
+        if (data.success) {
+          alert('Routine added successfully!');
+          setFormData({ day: 'Monday', time: '', endTime: '', courseId: '', batch: '', teacherId: '' });
+          setTeacherCourses([]);
+          setShowModal(false);
+          // Force refresh the routines list
+          await fetchRoutines(); 
+          console.log('Routines refreshed after adding'); // Debug log
+        } else {
+          alert(data.message || 'Failed to add routine');
+        }
+      } else {
+        const errorData = await response.json();
+        console.error('Add routine failed:', errorData);
+        alert(errorData.message || 'Failed to add routine');
+      }
+    } catch (error) {
+      console.error('Error adding routine:', error);
+      alert('Error adding routine');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteRoutine = async (routineId: number) => {
+    if (!confirm('Are you sure you want to delete this routine?')) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('attendanceToken');
+      const response = await fetch(`http://localhost:8080/api/admin/routine/${routineId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          alert('Routine deleted successfully!');
+          fetchRoutines(); // Refresh the list
+        } else {
+          alert(data.message || 'Failed to delete routine');
+        }
+      } else {
+        const errorData = await response.json();
+        alert(errorData.message || 'Failed to delete routine');
+      }
+    } catch (error) {
+      console.error('Error deleting routine:', error);
+      alert('Error deleting routine');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredRoutines = routines.filter(routine => 
+    !selectedBatch || routine.studentBatch === selectedBatch
+  );
 
   return (
     <div className="fade-in">
-      {/* Header Controls */}
       <div className="card mb-4">
         <div className="card-body">
-          <div className="row align-items-center">
-            <div className="col-md-4">
-              <h5 className="mb-0">
-                <i className="fas fa-calendar-alt me-2"></i>Routine Management
-              </h5>
+          <div className="row">
+            <div className="col-md-6">
+              <h4>Routine Management</h4>
+              <p className="text-muted">Manage class schedules</p>
             </div>
-            <div className="col-md-8 text-end">
-              <div className="btn-group me-2">
-                <button 
-                  className="btn btn-outline-info"
-                  onClick={downloadTemplate}
-                >
-                  <i className="fas fa-download me-2"></i>Template
-                </button>
-                <button 
-                  className="btn btn-outline-success"
-                  onClick={exportRoutines}
-                >
-                  <i className="fas fa-file-export me-2"></i>Export
-                </button>
-              </div>
+            <div className="col-md-6 text-end">
               <button 
                 className="btn btn-primary"
-                onClick={() => setShowAddModal(true)}
+                onClick={() => setShowModal(true)}
               >
-                <i className="fas fa-plus me-2"></i>Add Routine
+                Add Routine
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* CSV Upload */}
       <div className="card mb-4">
-        <div className="card-header">
-          <h6><i className="fas fa-upload me-2"></i>Bulk Upload</h6>
-        </div>
-        <div className="card-body">
-          <div className="row align-items-center">
-            <div className="col-md-6">
-              <p className="mb-0">Upload a CSV file to add multiple routines at once.</p>
-              <small className="text-muted">
-                Format: Day, Time, Subject, Teacher, Room
-              </small>
-            </div>
-            <div className="col-md-6">
-              <input
-                type="file"
-                className="form-control"
-                accept=".csv"
-                onChange={handleCSVUpload}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Weekly Schedule View */}
-      <div className="card mb-4">
-        <div className="card-header">
-          <h6><i className="fas fa-calendar-week me-2"></i>Weekly Schedule Overview</h6>
-        </div>
         <div className="card-body">
           <div className="row">
-            {days.map(day => (
-              <div key={day} className="col-md-2 mb-3">
-                <div className="card bg-light">
-                  <div className="card-header bg-primary text-white text-center py-2">
-                    <strong>{day}</strong>
-                  </div>
-                  <div className="card-body p-2">
-                    {routines
-                      .filter(routine => routine.day === day)
-                      .map(routine => (
-                        <div key={routine.id} className="mb-2">
-                          <div className="card card-body p-2">
-                            <div className="small">
-                              <div className="fw-bold">{routine.time}</div>
-                              <div className="text-primary">{routine.subject}</div>
-                              <div className="text-muted">{routine.room}</div>
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    }
-                  </div>
-                </div>
-              </div>
-            ))}
+            <div className="col-md-4">
+              <label className="form-label">Filter by Batch</label>
+              <select
+                className="form-select"
+                value={selectedBatch}
+                onChange={(e) => setSelectedBatch(e.target.value)}
+                disabled={loading}
+              >
+                <option value="">{loading ? 'Loading batches...' : 'All Batches'}</option>
+                {batches.map(batch => (
+                  <option key={batch} value={batch}>{batch}</option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Routines Table */}
       <div className="card">
         <div className="card-header">
-          <h6><i className="fas fa-list me-2"></i>All Routines</h6>
+          <h6>Routines ({filteredRoutines.length})</h6>
         </div>
         <div className="card-body">
-          <div className="table-responsive">
-            <table className="table table-hover">
-              <thead>
-                <tr>
-                  <th>Day</th>
-                  <th>Time</th>
-                  <th>Subject</th>
-                  <th>Teacher</th>
-                  <th>Room</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {routines.map((routine) => (
-                  <tr key={routine.id}>
-                    <td>
-                      <span className="badge bg-primary">{routine.day}</span>
-                    </td>
-                    <td>{routine.time}</td>
-                    <td className="fw-semibold">{routine.subject}</td>
-                    <td>{routine.teacher}</td>
-                    <td>
-                      <span className="badge bg-light text-dark">{routine.room}</span>
-                    </td>
-                    <td>
-                      <div className="btn-group" role="group">
-                        <button 
-                          className="btn btn-sm btn-outline-primary"
-                          onClick={() => handleEditRoutine(routine)}
-                        >
-                          <i className="fas fa-edit"></i>
-                        </button>
-                        <button 
-                          className="btn btn-sm btn-outline-danger"
-                          onClick={() => handleDeleteRoutine(routine.id)}
-                        >
-                          <i className="fas fa-trash"></i>
-                        </button>
-                      </div>
-                    </td>
+          {filteredRoutines.length === 0 ? (
+            <div className="text-center py-4">
+              <p>No routines found. Add your first routine!</p>
+            </div>
+          ) : (
+            <div className="table-responsive">
+              <table className="table table-striped">
+                <thead>
+                  <tr>
+                    <th>Day</th>
+                    <th>Start Time</th>
+                    <th>End Time</th>
+                    <th>Course</th>
+                    <th>Teacher</th>
+                    <th>Batch</th>
+                    <th>Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {filteredRoutines.map(routine => (
+                    <tr key={routine.routineId}>
+                      <td>{routine.day}</td>
+                      <td>{routine.courseTime}</td>
+                      <td>{routine.endTime}</td>
+                      <td>{routine.courseTitle}</td>
+                      <td>{routine.teacherName}</td>
+                      <td>
+                        <span className="badge bg-info">{routine.studentBatch}</span>
+                      </td>
+                      <td>
+                        <button
+                          className="btn btn-sm btn-danger"
+                          onClick={() => deleteRoutine(routine.routineId)}
+                          disabled={loading}
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Add/Edit Routine Modal */}
-      {showAddModal && (
+      {showModal && (
         <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="modal-dialog">
             <div className="modal-content">
               <div className="modal-header">
-                <h5 className="modal-title">
-                  {editingRoutine ? 'Edit Routine' : 'Add New Routine'}
-                </h5>
+                <h5 className="modal-title">Add New Routine</h5>
                 <button 
                   type="button" 
                   className="btn-close"
-                  onClick={() => {
-                    setShowAddModal(false);
-                    setEditingRoutine(null);
-                    setFormData({ day: 'Monday', time: '', subject: '', teacher: '', room: '' });
-                  }}
+                  onClick={() => setShowModal(false)}
                 ></button>
               </div>
               <div className="modal-body">
-                <form>
-                  <div className="mb-3">
-                    <label className="form-label">Day</label>
-                    <select
-                      className="form-select"
-                      value={formData.day}
-                      onChange={(e) => setFormData({...formData, day: e.target.value})}
-                    >
-                      {days.map(day => (
-                        <option key={day} value={day}>{day}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="mb-3">
-                    <label className="form-label">Time</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={formData.time}
-                      onChange={(e) => setFormData({...formData, time: e.target.value})}
-                      placeholder="e.g., 9:00 AM - 11:00 AM"
-                    />
-                  </div>
-                  <div className="mb-3">
-                    <label className="form-label">Subject</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={formData.subject}
-                      onChange={(e) => setFormData({...formData, subject: e.target.value})}
-                      placeholder="Enter subject name"
-                    />
-                  </div>
-                  <div className="mb-3">
-                    <label className="form-label">Teacher</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={formData.teacher}
-                      onChange={(e) => setFormData({...formData, teacher: e.target.value})}
-                      placeholder="Enter teacher name"
-                    />
-                  </div>
-                  <div className="mb-3">
-                    <label className="form-label">Room</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={formData.room}
-                      onChange={(e) => setFormData({...formData, room: e.target.value})}
-                      placeholder="Enter room number"
-                    />
-                  </div>
-                </form>
+                <div className="mb-3">
+                  <label className="form-label">Batch</label>
+                  <select
+                    className="form-select"
+                    value={formData.batch}
+                    onChange={(e) => setFormData({...formData, batch: e.target.value, courseId: ''})}
+                    disabled={loading}
+                  >
+                    <option value="">{loading ? 'Loading batches...' : 'Select Batch'}</option>
+                    {batches.map(batch => (
+                      <option key={batch} value={batch}>{batch}</option>
+                    ))}
+                  </select>
+                  {batches.length === 0 && !loading && (
+                    <small className="text-muted">No batches available.</small>
+                  )}
+                </div>
+                
+                <div className="mb-3">
+                  <label className="form-label">Day</label>
+                  <select
+                    className="form-select"
+                    value={formData.day}
+                    onChange={(e) => setFormData({...formData, day: e.target.value})}
+                  >
+                    {days.map(day => (
+                      <option key={day} value={day}>{day}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="mb-3">
+                  <label className="form-label">Start Time</label>
+                  <input
+                    type="time"
+                    className="form-control"
+                    value={formData.time}
+                    onChange={(e) => setFormData({...formData, time: e.target.value})}
+                    placeholder="HH:MM"
+                  />
+                  <small className="text-muted">Use 24-hour format (e.g., 09:00, 14:30)</small>
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label">End Time</label>
+                  <input
+                    type="time"
+                    className="form-control"
+                    value={formData.endTime}
+                    onChange={(e) => setFormData({...formData, endTime: e.target.value})}
+                    placeholder="HH:MM"
+                  />
+                  <small className="text-muted">End time must be after start time</small>
+                </div>
+                
+                <div className="mb-3">
+                  <label className="form-label">Course</label>
+                  <select
+                    className="form-select"
+                    value={formData.courseId}
+                    onChange={(e) => setFormData({...formData, courseId: e.target.value})}
+                    disabled={!formData.teacherId || teacherCourses.length === 0}
+                  >
+                    <option value="">
+                      {!formData.teacherId ? "Select teacher first" : 
+                       teacherCourses.length === 0 ? "No courses assigned to teacher" : "Select Course"}
+                    </option>
+                    {formData.teacherId && getAvailableCourses().map((course: any) => (
+                      <option key={course.id} value={course.id.toString()}>
+                        {course.code} - {course.title}
+                      </option>
+                    ))}
+                  </select>
+                  {formData.teacherId && teacherCourses.length === 0 && (
+                    <small className="text-muted">This teacher has no assigned courses. Please assign courses first.</small>
+                  )}
+                </div>
+                
+                <div className="mb-3">
+                  <label className="form-label">Teacher</label>
+                  <select
+                    className="form-select"
+                    value={formData.teacherId}
+                    onChange={(e) => {
+                      setFormData({...formData, teacherId: e.target.value, courseId: ''});
+                      fetchTeacherCourses(e.target.value);
+                    }}
+                    disabled={teachersLoading}
+                  >
+                    <option value="">
+                      {teachersLoading ? "Loading teachers..." : "Select Teacher"}
+                    </option>
+                    {teachers.map(teacher => (
+                      <option key={teacher.id} value={teacher.id.toString()}>
+                        {teacher.name} (@{teacher.username})
+                      </option>
+                    ))}
+                  </select>
+                  {teachers.length === 0 && !teachersLoading && (
+                    <small className="text-muted">No teachers found. Make sure teachers are registered first.</small>
+                  )}
+                </div>
               </div>
               <div className="modal-footer">
                 <button 
                   type="button" 
                   className="btn btn-secondary"
-                  onClick={() => {
-                    setShowAddModal(false);
-                    setEditingRoutine(null);
-                    setFormData({ day: 'Monday', time: '', subject: '', teacher: '', room: '' });
-                  }}
+                  onClick={() => setShowModal(false)}
                 >
                   Cancel
                 </button>
                 <button 
                   type="button" 
                   className="btn btn-primary"
-                  onClick={editingRoutine ? handleUpdateRoutine : handleAddRoutine}
+                  onClick={addRoutine}
                 >
-                  {editingRoutine ? 'Update Routine' : 'Add Routine'}
+                  Add Routine
                 </button>
               </div>
             </div>

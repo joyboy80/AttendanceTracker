@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const LoginPage = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const { login, user, isLoading } = useAuth();
+  const { darkMode, toggleDarkMode } = useTheme();
 
   if (user) {
     return <Navigate to="/" replace />;
@@ -29,11 +31,20 @@ const LoginPage = () => {
 
   return (
     <div className="login-container">
+      {/* Dark Mode Toggle */}
+      <button 
+        className="theme-toggle"
+        onClick={toggleDarkMode}
+        title={`Switch to ${darkMode ? 'light' : 'dark'} mode`}
+      >
+        <i className={`fas ${darkMode ? 'fa-sun' : 'fa-moon'}`}></i>
+      </button>
+
       <div className="login-card">
         <div className="text-center mb-4">
           <i className="fas fa-graduation-cap fa-3x text-primary mb-3"></i>
-          <h2 className="text-primary">University Attendance</h2>
-          <p className="text-muted">Sign in to your account</p>
+          <h2 className="text-primary">Smart Biometric Attendance Tracker</h2>
+          <p className="text-muted">Sign in to access your account</p>
         </div>
 
         <form onSubmit={handleSubmit}>

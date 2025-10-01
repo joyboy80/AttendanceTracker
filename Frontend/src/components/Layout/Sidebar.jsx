@@ -14,12 +14,14 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         return [
           { path: '/student', icon: 'fas fa-tachometer-alt', label: 'Dashboard' },
           { path: '/student/courses', icon: 'fas fa-graduation-cap', label: 'My Courses' },
+          { path: '/student/schedule', icon: 'fas fa-calendar-week', label: 'My Schedule' },
           { path: '/student/attendance', icon: 'fas fa-check-circle', label: 'Give Attendance' },
           { path: '/student/statistics', icon: 'fas fa-chart-bar', label: 'Statistics' },
         ];
       case 'TEACHER':
         return [
           { path: '/teacher', icon: 'fas fa-tachometer-alt', label: 'Dashboard' },
+          { path: '/teacher/schedule', icon: 'fas fa-calendar-week', label: 'My Schedule' },
           { path: '/teacher/activate', icon: 'fas fa-play-circle', label: 'Activate Attendance' },
           { path: '/teacher/courses', icon: 'fas fa-graduation-cap', label: 'My Assigned Courses' },
           { path: '/teacher/statistics', icon: 'fas fa-chart-line', label: 'Statistics' },

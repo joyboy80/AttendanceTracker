@@ -38,6 +38,9 @@ public class AttendanceService {
         session.setAccessCode(UUID.randomUUID().toString());
         session.setStatus(SessionStatus.ACTIVE);
         session.setIsActive(true);
+        // Set a temporary expiry time of 10 minutes to allow students to see the session
+        // This will be updated when teacher actually starts the attendance
+        session.setExpiryTime(Instant.now().plusSeconds(600)); // 10 minutes from now
         session.setTeacherName(teacherName);
         session.setTeacherUsername(teacherUsername);
         classSessionRepository.save(session);
@@ -48,10 +51,22 @@ public class AttendanceService {
         Optional<ClassSession> sessionOpt = classSessionRepository.findById(sessionId);
         ClassSession session = sessionOpt.orElseThrow(() -> new RuntimeException("Session not found"));
         
-        // Set absolute start time and 120-second maximum limit
-        Instant startTime = Instant.now();
+        // Check if attendance records already exist for this session
+        List<Attendance> existingAttendances = attendanceRepository.findBySessionID(sessionId);
+        
+        Instant startTime;
+        if (!existingAttendances.isEmpty()) {
+            // If students have already marked attendance, keep the original scheduled time
+            // to ensure their attendance remains valid
+            startTime = session.getScheduledTime();
+        } else {
+            // If no one has marked attendance yet, update start time to now
+            startTime = Instant.now();
+            session.setScheduledTime(startTime);
+        }
+        
+        // Set duration and expiry time
         int actualDuration = Math.min(durationSeconds, 120); // Max 120 seconds
-        session.setScheduledTime(startTime);
         session.setDurationMinutes(actualDuration);
         session.setExpiryTime(startTime.plusSeconds(actualDuration));
         session.setIsActive(true);
@@ -114,6 +129,7 @@ public class AttendanceService {
         // First get the session to check its time window
         Optional<ClassSession> sessionOpt = classSessionRepository.findById(sessionId);
         if (!sessionOpt.isPresent()) {
+            System.out.println("DEBUG: Session not found for ID: " + sessionId);
             return new java.util.ArrayList<>();
         }
         
@@ -121,18 +137,34 @@ public class AttendanceService {
         Instant sessionStart = session.getScheduledTime();
         Instant sessionEnd = session.getExpiryTime();
         
+        System.out.println("DEBUG: Session found - ID: " + sessionId + 
+                          ", Start: " + sessionStart + 
+                          ", End: " + sessionEnd + 
+                          ", Code: " + session.getAccessCode());
+        
         // Get all attendance records for this session
         List<Attendance> allAttendances = attendanceRepository.findBySessionID(sessionId);
+        System.out.println("DEBUG: Found " + allAttendances.size() + " total attendance records for session " + sessionId);
         
         // Filter only records within the session's time window
         List<Attendance> validAttendances = allAttendances.stream()
             .filter(attendance -> {
                 Instant attendanceTime = attendance.getTimestamp();
-                return attendanceTime.isAfter(sessionStart) && 
-                       attendanceTime.isBefore(sessionEnd) &&
-                       attendance.getAttendanceCode().equals(session.getAccessCode());
+                boolean timeValid = (!attendanceTime.isBefore(sessionStart)) && 
+                                  (!attendanceTime.isAfter(sessionEnd));
+                boolean codeValid = attendance.getAttendanceCode().equals(session.getAccessCode());
+                
+                System.out.println("DEBUG: Attendance record - Time: " + attendanceTime + 
+                                 ", Code: " + attendance.getAttendanceCode() + 
+                                 ", TimeValid: " + timeValid + 
+                                 ", CodeValid: " + codeValid + 
+                                 ", StudentID: " + attendance.getStudentID());
+                
+                return timeValid && codeValid;
             })
             .collect(java.util.stream.Collectors.toList());
+            
+        System.out.println("DEBUG: " + validAttendances.size() + " valid attendance records after filtering");
         
         return validAttendances.stream().map(attendance -> {
             Map<String, Object> details = new HashMap<>();
@@ -303,6 +335,12 @@ public class AttendanceService {
         stats.put("remainingTime", getRemainingTime(sessionId));
         
         return stats;
+    }
+    
+    public List<ClassSession> getAllSessionsForCourse(String courseCode) {
+        return classSessionRepository.findAll().stream()
+                .filter(s -> courseCode.equals(s.getCourseCode()))
+                .collect(java.util.stream.Collectors.toList());
     }
 }
 

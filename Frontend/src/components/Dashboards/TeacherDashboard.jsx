@@ -6,6 +6,7 @@ import TeacherOverview from '../Teacher/TeacherOverview';
 import TeacherStatistics from '../Teacher/TeacherStatistics';
 import ActivateAttendance from '../Teacher/ActivateAttendance';
 import AssignedCourses from '../Teacher/AssignedCourses.tsx';
+import TeacherSchedule from '../Teacher/TeacherSchedule';
 
 const TeacherDashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -21,6 +22,8 @@ const TeacherDashboard = () => {
         return 'Teacher Dashboard';
       case '/teacher/overview':
         return 'Overview';
+      case '/teacher/schedule':
+        return 'My Teaching Schedule';
       case '/teacher/statistics':
         return 'Statistics';
       case '/teacher/activate':
@@ -46,6 +49,7 @@ const TeacherDashboard = () => {
           <Routes>
             <Route path="/" element={<TeacherOverview />} />
             <Route path="/activate" element={<ActivateAttendance />} />
+            <Route path="/schedule" element={<TeacherSchedule />} />
             <Route path="/statistics" element={<TeacherStatistics />} />
             <Route path="/courses" element={<AssignedCourses />} />
           </Routes>
