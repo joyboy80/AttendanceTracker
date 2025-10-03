@@ -66,6 +66,17 @@ public class AttendanceController {
                 .orElse(ResponseEntity.ok(null));
     }
     
+    @GetMapping("/active-for-student")
+    public ResponseEntity<?> getActiveSessionForStudent(@RequestParam Long studentId) {
+        System.out.println("DEBUG: Getting active session for student ID: " + studentId);
+        return attendanceService.getCurrentActiveSessionForStudentId(studentId)
+                .map(session -> {
+                    System.out.println("DEBUG: Found session: " + session.getSessionID() + " for course: " + session.getCourseCode());
+                    return ResponseEntity.ok(session);
+                })
+                .orElse(ResponseEntity.ok(null));
+    }
+    
     @PostMapping("/stop")
     public ResponseEntity<?> stopSession(@RequestParam Long sessionId) {
         try {

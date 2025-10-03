@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 
 const AttendancePage = () => {
+  const { user } = useAuth();
   const [attendanceCode, setAttendanceCode] = useState('');
   const [isLocationVerified, setIsLocationVerified] = useState(false);
   const [isBiometricVerified, setIsBiometricVerified] = useState(false);
@@ -24,41 +26,113 @@ const AttendancePage = () => {
     };
     setCurrentClass(courseInfo);
     
-    // Check for active session and load real teacher info
-    checkActiveSession();
-  }, []);
+    // Only start polling if user is available
+    if (user && user.id) {
+      // Check for active session immediately
+      checkActiveSession();
+      
+      // Set up automatic polling for active sessions every 2 seconds
+      const pollInterval = setInterval(() => {
+        console.log('🔄 Polling for active sessions...');
+        checkActiveSession();
+      }, 2000);
+      
+      // Cleanup interval on component unmount
+      return () => {
+        console.log('🧹 Cleaning up polling interval');
+        clearInterval(pollInterval);
+      };
+    }
+  }, [user]); // Add user as dependency
 
   const checkActiveSession = async () => {
     try {
+      if (!user || !user.id) {
+        console.log('❌ No user or user ID available');
+        return;
+      }
+      
       const token = localStorage.getItem('attendanceToken');
-      const res = await fetch('http://localhost:8080/api/attendance/active?courseCode=CS101', {
+      console.log('🔍 Checking for active session for student ID:', user.id);
+      
+      const res = await fetch(`http://localhost:8080/api/attendance/active-for-student?studentId=${user.id}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
+      
+      console.log('📡 API Response Status:', res.status);
+      
       if (res.ok) {
         const session = await res.json();
-        if (session && session.sessionID) {
+        console.log('📋 Session Response Data:', session);
+        console.log('🔍 Session type:', typeof session);
+        console.log('🔍 Session keys:', session ? Object.keys(session) : 'null/undefined');
+        
+        // Handle different response formats
+        if (session && (session.sessionID || session.sessionId)) {
+          const sessionId = session.sessionID || session.sessionId;
+          console.log('✅ Active session found:', sessionId);
+          
           // Store session ID for status checking, but don't auto-fill the code
-          localStorage.setItem('activeAttendanceSessionId', String(session.sessionID));
+          localStorage.setItem('activeAttendanceSessionId', String(sessionId));
+          // Show notification if this is a new session detection
+          const wasActive = isSessionActive;
           setIsSessionActive(true);
+          
+          if (!wasActive) {
+            console.log('🎉 NEW SESSION DETECTED! Showing notification...');
+            // You could add a toast notification here
+          }
           
           // Extract and store teacher information
           if (session.teacherName && session.teacherUsername) {
+            console.log('👨‍🏫 Teacher:', session.teacherName);
             setTeacherName(session.teacherName);
             setTeacherUsername(session.teacherUsername);
           }
           
+          // Update current class with real course information
+          if (session.courseCode) {
+            console.log('📚 Course Code:', session.courseCode);
+            setCurrentClass({
+              subject: session.courseCode,
+              room: 'Room 101', // Could be enhanced to get from database
+              time: session.expiryTime ? new Date(session.expiryTime).toLocaleTimeString() : 'Active Now',
+              isActive: true
+            });
+          }
+          
           // Check if session is paused
-          setIsSessionPaused(!session.isActive);
+          const sessionIsActive = session.isActive !== false; // Handle null/undefined as active
+          setIsSessionPaused(!sessionIsActive);
+          console.log('🎮 Session Active:', sessionIsActive);
           
           // Store absolute end time for countdown timer
           if (session.expiryTime) {
-            setSessionEndTime(new Date(session.expiryTime));
+            const expiryDate = new Date(session.expiryTime);
+            setSessionEndTime(expiryDate);
+            console.log('⏰ Session expires at:', expiryDate);
+            
+            // Calculate remaining time
+            const now = new Date();
+            const remaining = Math.max(0, Math.floor((expiryDate.getTime() - now.getTime()) / 1000));
+            setTimeRemaining(remaining);
+            console.log('⏱️ Time remaining:', remaining, 'seconds');
           }
           
           // Check session status and get remaining time
-          await checkSessionStatus(session.sessionID);
+          await checkSessionStatus(sessionId);
         } else {
-          // No active session
+          console.log('❌ No active session found or invalid session data');
+          console.log('🐛 Session object:', session);
+          console.log('🐛 Session is null?', session === null);
+          console.log('🐛 Session is undefined?', session === undefined);
+          console.log('🐛 Session is empty object?', session && Object.keys(session).length === 0);
+          
+          // No active session - but only update state if we're not currently showing an active session
+          // This prevents flickering during polling
+          if (isSessionActive) {
+            console.log('🔄 Session ended, updating state to inactive');
+          }
           setIsSessionActive(false);
           setIsSessionPaused(false);
           setTimeRemaining(0);
@@ -286,6 +360,21 @@ const AttendancePage = () => {
         <i className="fas fa-hourglass-end fa-4x text-muted mb-3"></i>
         <h3 className="text-muted">No Active Attendance Session</h3>
         <p>There is no active attendance session at the moment. Wait for your teacher to start the session.</p>
+        <div className="alert alert-info mt-3">
+          <i className="fas fa-sync-alt fa-spin me-2"></i>
+          Automatically checking for new sessions every 2 seconds...
+        </div>
+        <div className="mt-3">
+          <button 
+            className="btn btn-outline-primary" 
+            onClick={() => {
+              console.log('🔄 Manual refresh requested');
+              checkActiveSession();
+            }}
+          >
+            <i className="fas fa-refresh me-2"></i>Check Now
+          </button>
+        </div>
       </div>
     );
   }
@@ -478,6 +567,51 @@ const AttendancePage = () => {
                         (isLocationVerified ? 1 : 0) + 
                         (isBiometricVerified ? 1 : 0)} of 3 steps completed
             </small>
+          </div>
+        </div>
+      </div>
+
+      {/* Debug Panel - Remove this after fixing */}
+      <div className="card mt-4 border-warning">
+        <div className="card-header bg-warning text-dark">
+          <h6 className="mb-0"><i className="fas fa-bug me-2"></i>Debug Info (Remove after fixing)</h6>
+        </div>
+        <div className="card-body">
+          <div className="row">
+            <div className="col-md-6">
+              <small>
+                <strong>Session State:</strong><br/>
+                • Is Active: {isSessionActive ? '✅ Yes' : '❌ No'}<br/>
+                • Is Paused: {isSessionPaused ? '⏸️ Yes' : '▶️ No'}<br/>
+                • Time Remaining: {timeRemaining}s<br/>
+                • Teacher: {teacherName || 'Not set'}
+              </small>
+            </div>
+            <div className="col-md-6">
+              <small>
+                <strong>Storage:</strong><br/>
+                • Session ID: {localStorage.getItem('activeAttendanceSessionId') || 'None'}<br/>
+                • Token: {localStorage.getItem('attendanceToken') ? '✅ Present' : '❌ Missing'}<br/>
+                • User: {localStorage.getItem('attendanceUser') ? '✅ Present' : '❌ Missing'}
+              </small>
+            </div>
+          </div>
+          <div className="mt-2">
+            <button 
+              className="btn btn-sm btn-outline-info me-2" 
+              onClick={checkActiveSession}
+            >
+              🔄 Check Session Now
+            </button>
+            <button 
+              className="btn btn-sm btn-outline-secondary" 
+              onClick={() => console.log('Current state:', {
+                isSessionActive, isSessionPaused, timeRemaining, 
+                teacherName, sessionEndTime
+              })}
+            >
+              📋 Log Current State
+            </button>
           </div>
         </div>
       </div>

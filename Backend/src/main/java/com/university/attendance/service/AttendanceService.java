@@ -7,6 +7,7 @@ import com.university.attendance.entity.ClassSession;
 import com.university.attendance.entity.SessionStatus;
 import com.university.attendance.repository.AttendanceRepository;
 import com.university.attendance.repository.ClassSessionRepository;
+import com.university.attendance.repository.EnrollmentRepository;
 import com.university.attendance.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -29,6 +30,9 @@ public class AttendanceService {
     
     @Autowired
     private UserRepository userRepository;
+    
+    @Autowired
+    private EnrollmentRepository enrollmentRepository;
 
     public GenerateCodeResponse generateCode(String courseCode, String teacherName, String teacherUsername) {
         ClassSession session = new ClassSession();
@@ -283,6 +287,43 @@ public class AttendanceService {
                     session.getTeacherUsername(),
                     session.getRemainingTime()
                 ));
+    }
+    
+    public Optional<StudentSessionResponse> getCurrentActiveSessionForStudentId(Long studentId) {
+        System.out.println("DEBUG: Finding active sessions for student ID: " + studentId);
+        
+        // First, get all courses the student is enrolled in
+        List<String> enrolledCourses = enrollmentRepository.findCourseCodesByStudentId(studentId);
+        System.out.println("DEBUG: Student enrolled in courses: " + enrolledCourses);
+        
+        if (enrolledCourses.isEmpty()) {
+            System.out.println("DEBUG: Student not enrolled in any courses");
+            return Optional.empty();
+        }
+        
+        // Find any active session in the student's enrolled courses
+        for (String courseCode : enrolledCourses) {
+            Optional<ClassSession> activeSession = getCurrentActiveSession(courseCode);
+            if (activeSession.isPresent()) {
+                System.out.println("DEBUG: Found active session for course: " + courseCode + 
+                                 ", Session ID: " + activeSession.get().getSessionID());
+                ClassSession session = activeSession.get();
+                return Optional.of(new StudentSessionResponse(
+                    session.getSessionID(),
+                    session.getCourseCode(),
+                    session.getAccessCode(),
+                    session.getExpiryTime(),
+                    session.getStatus(),
+                    session.getIsActive(),
+                    session.getTeacherName(),
+                    session.getTeacherUsername(),
+                    session.getRemainingTime()
+                ));
+            }
+        }
+        
+        System.out.println("DEBUG: No active sessions found for any enrolled courses");
+        return Optional.empty();
     }
     
     public boolean isSessionActive(Long sessionId) {

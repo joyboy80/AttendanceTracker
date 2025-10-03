@@ -36,7 +36,7 @@ public class Student extends User {
                    String batch, String section, String photo) {
         super(firstName, middleName, lastName, email, phone, username, password, UserRole.STUDENT, batch);
         this.department = department;
-        this.batch = batch;
+        this.batch = batch; // Store batch in students table
         this.section = section;
         this.photo = photo;
     }
