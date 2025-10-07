@@ -1,49 +1,59 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import StatsCard from '../Common/StatsCard';
+import attendanceService from '../../services/attendanceService';
+import { useAuth } from '../../contexts/AuthContext';
 
 const StatisticsPage = () => {
+  const { user } = useAuth();
   const [selectedSubject, setSelectedSubject] = useState('all');
+  const [subjects, setSubjects] = useState([{ id: 'all', name: 'All Subjects' }]);
+  const [attendanceData, setAttendanceData] = useState([]);
+  const [statistics, setStatistics] = useState({ total: 0, present: 0, absent: 0, percentage: 0 });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Mock data
-  const subjects = [
-    { id: 'all', name: 'All Subjects' },
-    { id: 'cs', name: 'Computer Science' },
-    { id: 'math', name: 'Mathematics' },
-    { id: 'physics', name: 'Physics' },
-    { id: 'chemistry', name: 'Chemistry' }
-  ];
-
-  const attendanceData = [
-    { date: '2024-01-15', subject: 'Computer Science', status: 'Present', time: '9:00 AM' },
-    { date: '2024-01-15', subject: 'Mathematics', status: 'Present', time: '2:00 PM' },
-    { date: '2024-01-16', subject: 'Physics', status: 'Absent', time: '10:00 AM' },
-    { date: '2024-01-17', subject: 'Computer Science', status: 'Present', time: '9:00 AM' },
-    { date: '2024-01-18', subject: 'Chemistry', status: 'Present', time: '11:00 AM' },
-    { date: '2024-01-19', subject: 'Mathematics', status: 'Present', time: '2:00 PM' },
-  ];
-
-  const getFilteredData = () => {
-    if (selectedSubject === 'all') return attendanceData;
-    return attendanceData.filter(record => 
-      record.subject.toLowerCase().includes(selectedSubject === 'cs' ? 'computer' : selectedSubject)
-    );
+  const fetchStatistics = async (courseCode = 'all') => {
+    try {
+      setLoading(true);
+      setError(null);
+      if (!user?.id) {
+        setError('User not found');
+        setLoading(false);
+        return;
+      }
+      console.log('Fetching statistics for user:', user.id, 'course:', courseCode);
+      const response = await attendanceService.getStudentStatistics(user.id, courseCode);
+      console.log('Statistics response:', response);
+      if (response.success) {
+        setStatistics(response.statistics);
+        setAttendanceData(response.attendanceRecords);
+        setSubjects(response.courses);
+      } else {
+        setError('Failed to fetch statistics');
+      }
+    } catch (err) {
+      console.error('Statistics fetch error:', err);
+      setError(`Error loading statistics: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const calculateStats = () => {
-    const filtered = getFilteredData();
-    const total = filtered.length;
-    const present = filtered.filter(record => record.status === 'Present').length;
-    const percentage = total > 0 ? ((present / total) * 100).toFixed(1) : '0';
-    
-    return { total, present, absent: total - present, percentage };
-  };
+  useEffect(() => {
+    fetchStatistics(selectedSubject);
+    // eslint-disable-next-line
+  }, [user?.id]);
 
-  const stats = calculateStats();
+  const handleSubjectChange = (subjectId) => {
+    setSelectedSubject(subjectId);
+    fetchStatistics(subjectId);
+  };
 
   const downloadCSV = () => {
     const csvContent = [
       ['Date', 'Subject', 'Status', 'Time'],
-      ...getFilteredData().map(record => [
+      ...attendanceData.map(record => [
         record.date,
         record.subject,
         record.status,
@@ -59,6 +69,40 @@ const StatisticsPage = () => {
     a.click();
     window.URL.revokeObjectURL(url);
   };
+
+  if (loading) {
+    return (
+      <div className="fade-in">
+        <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '400px' }}>
+          <div className="text-center">
+            <div className="spinner-border text-primary mb-3" role="status">
+              <span className="visually-hidden">Loading...</span>
+            </div>
+            <h5 className="text-muted">Loading Statistics...</h5>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="fade-in">
+        <div className="alert alert-danger d-flex align-items-center" role="alert">
+          <i className="fas fa-exclamation-triangle me-2"></i>
+          <div>
+            <strong>Error:</strong> {error}
+          </div>
+          <button 
+            className="btn btn-outline-danger ms-auto"
+            onClick={() => fetchStatistics(selectedSubject)}
+          >
+            <i className="fas fa-redo me-1"></i>Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fade-in">
@@ -76,7 +120,7 @@ const StatisticsPage = () => {
                 <select
                   className="form-select"
                   value={selectedSubject}
-                  onChange={(e) => setSelectedSubject(e.target.value)}
+                  onChange={(e) => handleSubjectChange(e.target.value)}
                 >
                   {subjects.map(subject => (
                     <option key={subject.id} value={subject.id}>
@@ -87,6 +131,7 @@ const StatisticsPage = () => {
                 <button
                   className="btn btn-success"
                   onClick={downloadCSV}
+                  disabled={attendanceData.length === 0}
                 >
                   <i className="fas fa-download me-2"></i>CSV
                 </button>
@@ -101,7 +146,7 @@ const StatisticsPage = () => {
         <div className="col-md-3 mb-3">
           <StatsCard
             title="Total Classes"
-            value={stats.total}
+            value={statistics.total}
             icon="fas fa-calendar"
             color="primary"
           />
@@ -109,7 +154,7 @@ const StatisticsPage = () => {
         <div className="col-md-3 mb-3">
           <StatsCard
             title="Classes Attended"
-            value={stats.present}
+            value={statistics.present}
             icon="fas fa-check-circle"
             color="success"
           />
@@ -117,7 +162,7 @@ const StatisticsPage = () => {
         <div className="col-md-3 mb-3">
           <StatsCard
             title="Classes Missed"
-            value={stats.absent}
+            value={statistics.absent}
             icon="fas fa-times-circle"
             color="danger"
           />
@@ -125,7 +170,7 @@ const StatisticsPage = () => {
         <div className="col-md-3 mb-3">
           <StatsCard
             title="Attendance Rate"
-            value={`${stats.percentage}%`}
+            value={`${statistics.percentage}%`}
             icon="fas fa-percentage"
             color="info"
           />
@@ -138,7 +183,7 @@ const StatisticsPage = () => {
           <h5><i className="fas fa-list me-2"></i>Attendance Records</h5>
         </div>
         <div className="card-body">
-          {getFilteredData().length === 0 ? (
+          {attendanceData.length === 0 ? (
             <div className="text-center py-4">
               <i className="fas fa-inbox fa-3x text-muted mb-3"></i>
               <h5 className="text-muted">No records found</h5>
@@ -156,14 +201,14 @@ const StatisticsPage = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {getFilteredData().map((record, index) => (
+                  {attendanceData.map((record, index) => (
                     <tr key={index}>
-                      <td>{new Date(record.date).toLocaleDateString()}</td>
+                      <td>{record.date}</td>
                       <td>{record.subject}</td>
                       <td>{record.time}</td>
                       <td>
-                        <span className={`badge ${record.status === 'Present' ? 'bg-success' : 'bg-danger'}`}>
-                          <i className={`fas fa-${record.status === 'Present' ? 'check' : 'times'} me-1`}></i>
+                        <span className={`badge ${record.status === 'PRESENT' || record.status === 'Present' ? 'bg-success' : 'bg-danger'}`}>
+                          <i className={`fas fa-${record.status === 'PRESENT' || record.status === 'Present' ? 'check' : 'times'} me-1`}></i>
                           {record.status}
                         </span>
                       </td>

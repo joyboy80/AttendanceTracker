@@ -288,20 +288,18 @@ const SignupPage = () => {
                   required
                 >
                   <option value="">Select Department</option>
-                  <option value="Computer Science">Computer Science</option>
-                  <option value="Information Technology">Information Technology</option>
-                  <option value="Software Engineering">Software Engineering</option>
-                  <option value="Data Science">Data Science</option>
-                  <option value="Cybersecurity">Cybersecurity</option>
-                  <option value="Mathematics">Mathematics</option>
-                  <option value="Physics">Physics</option>
-                  <option value="Chemistry">Chemistry</option>
-                  <option value="Biology">Biology</option>
-                  <option value="Business Administration">Business Administration</option>
-                  <option value="Economics">Economics</option>
-                  <option value="Psychology">Psychology</option>
-                  <option value="English">English</option>
-                  <option value="History">History</option>
+                  <option value="CE">1. CE (Civil Engineering)</option>
+                  <option value="EEE">2. EEE (Electrical and Electronic Engineering)</option>
+                  <option value="ME">3. ME (Mechanical Engineering)</option>
+                  <option value="CSE">4. CSE (Computer Science and Engineering)</option>
+                  <option value="URP">5. URP (Urban and Regional Planning)</option>
+                  <option value="ETE">6. ETE (Electronics and Telecommunication Engineering)</option>
+                  <option value="MIE">7. MIE (Mechatronics and Industrial Engineering)</option>
+                  <option value="MME">8. MME (Materials and Metallurgical Engineering)</option>
+                  <option value="WRE">9. WRE (Water Resources Engineering)</option>
+                  <option value="PME">10. PME (Petroleum and Mining Engineering)</option>
+                  <option value="BME">11. BME (Biomedical Engineering)</option>
+                  <option value="Archi">12. Archi (Architecture)</option>
                 </select>
               </div>
             )}

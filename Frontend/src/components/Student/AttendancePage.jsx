@@ -14,13 +14,50 @@ const AttendancePage = () => {
   const [sessionEndTime, setSessionEndTime] = useState(null);
   const [teacherName, setTeacherName] = useState('');
   const [teacherUsername, setTeacherUsername] = useState('');
+  const [hasFingerprint, setHasFingerprint] = useState(false);
+  const [fingerprintLoading, setFingerprintLoading] = useState(true);
+  
+  // Step completion tracking
+  const [step1Complete, setStep1Complete] = useState(false);
+  const [step2Complete, setStep2Complete] = useState(false);
+  const [step3Complete, setStep3Complete] = useState(false);
+
+  // Check fingerprint registration status
+  useEffect(() => {
+    const checkFingerprintStatus = async () => {
+      if (!user?.id) return;
+
+      try {
+        setFingerprintLoading(true);
+        const response = await fetch(`http://localhost:8080/api/attendance/fingerprint-status/${user.id}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('attendanceToken')}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setHasFingerprint(data.hasFingerprint);
+        }
+      } catch (err) {
+        console.error('Error checking fingerprint status:', err);
+        setHasFingerprint(false);
+      } finally {
+        setFingerprintLoading(false);
+      }
+    };
+
+    checkFingerprintStatus();
+  }, [user]);
 
   // Load active session and course info
   useEffect(() => {
     // Set basic course info (this could also come from props or route params)
     const courseInfo = {
       subject: 'Computer Science 101',
-      room: 'Room 101',
+      room: 'Room 3307',
       time: '9:00 AM - 11:00 AM',
       isActive: true
     };
@@ -95,7 +132,7 @@ const AttendancePage = () => {
             console.log('📚 Course Code:', session.courseCode);
             setCurrentClass({
               subject: session.courseCode,
-              room: 'Room 101', // Could be enhanced to get from database
+              room: 'Room 3307', // Could be enhanced to get from database
               time: session.expiryTime ? new Date(session.expiryTime).toLocaleTimeString() : 'Active Now',
               isActive: true
             });
@@ -258,40 +295,208 @@ const AttendancePage = () => {
   };
 
   const handleLocationVerification = async () => {
-    if (navigator.geolocation) {
-      setIsLocationVerified(false);
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          // Mock location verification
-          const { latitude, longitude } = position.coords;
-          console.log('Location:', latitude, longitude);
-          
-          // Simulate location verification
-          setTimeout(() => {
-            setIsLocationVerified(true);
-          }, 1500);
-        },
-        (error) => {
-          alert('Location access denied. Please enable location services.');
-        }
-      );
-    } else {
+    if (!navigator.geolocation) {
       alert('Geolocation is not supported by this browser.');
+      return;
     }
+
+    if (!attendanceCode.trim()) {
+      alert('Please enter the attendance code first.');
+      return;
+    }
+
+    setIsLocationVerified(false);
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          console.log('🌍 Student Location captured:', latitude, longitude);
+          console.log('🎫 Using attendance code:', attendanceCode);
+
+          const requestData = {
+            studentId: user.id,
+            latitude: latitude,
+            longitude: longitude,
+            attendanceCode: attendanceCode
+          };
+          
+          console.log('📡 Sending location verification request:', requestData);
+
+          // Send location to backend for verification
+          const response = await fetch('http://localhost:8080/api/attendance/verify-location', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('attendanceToken')}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestData),
+          });
+
+          console.log('📨 Response status:', response.status);
+
+          if (response.ok) {
+            const result = await response.json();
+            console.log('✅ Location verification result:', result);
+            
+            if (result.verified) {
+              setIsLocationVerified(true);
+              setStep2Complete(true);
+              alert(`✅ ${result.message}`);
+              
+              // Log teacher location info if available
+              if (result.teacherLocation) {
+                console.log('👨‍🏫 Teacher location:', result.teacherLocation);
+              }
+            } else {
+              console.log('❌ Location verification failed:', result.message);
+              alert(`❌ Location verification failed: ${result.message}`);
+              setIsLocationVerified(false);
+              setStep2Complete(false);
+            }
+          } else {
+            const errorData = await response.json();
+            console.error('❌ Server error:', errorData);
+            alert(`Location verification failed: ${errorData.error || 'Unknown error'}`);
+          }
+        } catch (error) {
+          console.error('❌ Location verification error:', error);
+          alert('Failed to verify location. Please try again.');
+        }
+      },
+      (error) => {
+        console.error('Geolocation error:', error);
+        let errorMessage = 'Location access denied. Please enable location services.';
+        if (error.code === error.PERMISSION_DENIED) {
+          errorMessage = 'Location permission denied. Please allow location access and try again.';
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+          errorMessage = 'Location information is unavailable. Please try again.';
+        } else if (error.code === error.TIMEOUT) {
+          errorMessage = 'Location request timed out. Please try again.';
+        }
+        alert(errorMessage);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    );
   };
 
   const handleBiometricVerification = async () => {
+    if (!user?.id) {
+      alert('User not authenticated');
+      return;
+    }
+
+    // Check if WebAuthn is supported
+    if (!window.PublicKeyCredential) {
+      alert('WebAuthn is not supported in this browser');
+      return;
+    }
+
     setIsBiometricVerified(false);
     
-    // Simulate WebAuthn biometric verification
     try {
-      // Mock biometric verification process
-      setTimeout(() => {
-        setIsBiometricVerified(true);
-      }, 2000);
-    } catch (error) {
-      alert('Biometric verification failed. Please try again.');
+      // Step 1: Get authentication options
+      const optionsResponse = await fetch('http://localhost:8080/api/attendance/authentication-options', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('attendanceToken')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId: user.id }),
+      });
+
+      if (!optionsResponse.ok) {
+        const errorData = await optionsResponse.json();
+        throw new Error(errorData.error || 'Failed to get authentication options');
+      }
+
+      const options = await optionsResponse.json();
+
+      // Convert Base64URL strings to ArrayBuffers
+      const credentialRequestOptions = {
+        publicKey: {
+          challenge: base64URLToArrayBuffer(options.challenge),
+          timeout: options.timeout,
+          rpId: options.rpId,
+          allowCredentials: options.allowCredentials.map(cred => ({
+            ...cred,
+            id: base64URLToArrayBuffer(cred.id),
+          })),
+          userVerification: options.userVerification,
+        },
+      };
+
+      // Step 2: Get assertion
+      const assertion = await navigator.credentials.get(credentialRequestOptions);
+
+      if (!assertion) {
+        throw new Error('Failed to get assertion');
+      }
+
+      // Step 3: Verify fingerprint and mark attendance automatically
+      const authenticationData = {
+        id: assertion.id,
+        rawId: arrayBufferToBase64URL(assertion.rawId),
+        type: assertion.type,
+        response: {
+          clientDataJSON: arrayBufferToBase64URL(assertion.response.clientDataJSON),
+          authenticatorData: arrayBufferToBase64URL(assertion.response.authenticatorData),
+          signature: arrayBufferToBase64URL(assertion.response.signature),
+          userHandle: assertion.response.userHandle ? 
+            arrayBufferToBase64URL(assertion.response.userHandle) : null,
+        },
+        userId: user.id,
+      };
+
+      // Verify fingerprint and mark attendance
+      const verifyResponse = await fetch('http://localhost:8080/api/attendance/verify', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('attendanceToken')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(authenticationData),
+      });
+
+      if (!verifyResponse.ok) {
+        const errorData = await verifyResponse.json();
+        throw new Error(errorData.error || 'Failed to verify fingerprint');
+      }
+
+      // Fingerprint verified successfully - set step as completed
+      setIsBiometricVerified(true);
+      setStep3Complete(true);
+      
+    } catch (err) {
+      console.error('Biometric verification error:', err);
+      alert(err.message || 'Biometric verification failed. Please try again.');
     }
+  };
+
+  // Utility functions for Base64URL conversion
+  const base64URLToArrayBuffer = (base64URL) => {
+    const base64 = base64URL.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
+    const binary = atob(padded);
+    const buffer = new ArrayBuffer(binary.length);
+    const view = new Uint8Array(buffer);
+    for (let i = 0; i < binary.length; i++) {
+      view[i] = binary.charCodeAt(i);
+    }
+    return buffer;
+  };
+
+  const arrayBufferToBase64URL = (buffer) => {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
   };
 
   const handleSubmitAttendance = async () => {
@@ -393,7 +598,12 @@ const AttendancePage = () => {
     );
   }
 
-  const canSubmit = attendanceCode.length > 0 && isLocationVerified && isBiometricVerified && isSessionActive && !isSessionPaused && timeRemaining > 0;
+  // Sequential step validation: Step 1 → Step 2 → Step 3 → Submit
+  const canSubmit = step1Complete && step2Complete && step3Complete && isSessionActive && !isSessionPaused && timeRemaining > 0;
+  
+  // Step access control
+  const canAccessStep2 = step1Complete;
+  const canAccessStep3 = step1Complete && step2Complete;
 
   return (
     <div className="fade-in">
@@ -406,7 +616,17 @@ const AttendancePage = () => {
             </div>
             <div className="text-end">
               <div className="h5 mb-0">
-                {timeRemaining > 0 ? `Time Remaining: ${formatTime(timeRemaining)}` : 'Session Expired'}
+                {timeRemaining > 0 ? (
+                  <>
+                    <i className="fas fa-clock me-1"></i>
+                    {formatTime(timeRemaining)}
+                  </>
+                ) : (
+                  <span className="text-danger">
+                    <i className="fas fa-exclamation-triangle me-1"></i>
+                    Session Expired
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -434,119 +654,211 @@ const AttendancePage = () => {
       </div>
 
       {/* Attendance Steps */}
-      <div className="row">
-        {/* Step 1: Attendance Code */}
-        <div className="col-md-4 mb-4">
-          <div className="card h-100">
-            <div className="card-header">
-              <h6><i className="fas fa-key me-2"></i>Step 1: Enter Code</h6>
-            </div>
-            <div className="card-body text-center">
-              <div className="mb-3">
-                <i className={`fas fa-keyboard fa-3x ${attendanceCode.length > 0 ? 'text-success' : 'text-muted'}`}></i>
-              </div>
-              <div className="mb-3">
-                <label htmlFor="attendanceCode" className="form-label">Attendance Code</label>
-                <input
-                  type="text"
-                  className="form-control text-center"
-                  id="attendanceCode"
-                  value={attendanceCode}
-                  onChange={(e) => setAttendanceCode(e.target.value)}
-                  placeholder="Enter attendance code provided by teacher"
-                  style={{ fontSize: '1.0rem' }}
-                />
-              </div>
-              {attendanceCode.length > 0 && (
-                <div className="text-success">
-                  <i className="fas fa-check-circle me-2"></i>Code Entered
+      <div className="card mb-4">
+        <div className="card-header">
+          <h6 className="mb-0">
+            <i className="fas fa-list-ol me-2"></i>
+            Complete All Steps to Mark Attendance
+          </h6>
+        </div>
+        <div className="card-body">
+          <div className="row">
+            {/* Step 1: Attendance Code */}
+            <div className="col-md-4 mb-3">
+              <div className={`card h-100 ${step1Complete ? 'border-success' : 'border-secondary'}`}>
+                <div className={`card-header ${step1Complete ? 'bg-success text-white' : 'bg-light'}`}>
+                  <h6 className="mb-0">
+                    <i className={`fas ${step1Complete ? 'fa-check-circle' : 'fa-key'} me-2`}></i>
+                    Step 1: Enter Code {step1Complete && <span className="badge bg-light text-success ms-2">✓</span>}
+                  </h6>
                 </div>
-              )}
+                <div className="card-body text-center">
+                  <div className="mb-3">
+                    <i className={`fas fa-keyboard fa-2x ${attendanceCode.length > 0 ? 'text-success' : 'text-muted'}`}></i>
+                  </div>
+                  <div className="mb-3">
+                    <label htmlFor="attendanceCode" className="form-label">Attendance Code</label>
+                    <input
+                      type="text"
+                      className="form-control text-center"
+                      id="attendanceCode"
+                      value={attendanceCode}
+                      onChange={(e) => {
+                        const code = e.target.value;
+                        setAttendanceCode(code);
+                        setStep1Complete(code.trim().length > 0);
+                        
+                        // Reset subsequent steps if code is changed
+                        if (code.trim().length === 0) {
+                          setStep2Complete(false);
+                          setStep3Complete(false);
+                          setIsLocationVerified(false);
+                          setIsBiometricVerified(false);
+                        }
+                      }}
+                      placeholder="Enter code from teacher"
+                      style={{ fontSize: '0.9rem' }}
+                    />
+                  </div>
+                  {attendanceCode.length > 0 && (
+                    <div className="text-success">
+                      <i className="fas fa-check-circle me-1"></i>Code Entered
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Step 2: Location Verification */}
+            <div className="col-md-4 mb-3">
+              <div className={`card h-100 ${step2Complete ? 'border-success' : canAccessStep2 ? 'border-primary' : 'border-secondary'}`}>
+                <div className={`card-header ${step2Complete ? 'bg-success text-white' : canAccessStep2 ? 'bg-primary text-white' : 'bg-light'}`}>
+                  <h6 className="mb-0">
+                    <i className={`fas ${step2Complete ? 'fa-check-circle' : 'fa-map-marker-alt'} me-2`}></i>
+                    Step 2: Verify Location {step2Complete && <span className="badge bg-light text-success ms-2">✓</span>}
+                  </h6>
+                </div>
+                <div className="card-body text-center">
+                  {!canAccessStep2 ? (
+                    <div>
+                      <div className="mb-3">
+                        <i className="fas fa-lock fa-2x text-muted"></i>
+                      </div>
+                      <p className="text-muted small">Complete Step 1 first</p>
+                      <button className="btn btn-sm btn-secondary w-100" disabled>
+                        <i className="fas fa-lock me-1"></i>Locked
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="mb-3">
+                        <i className={`fas fa-map-marker-alt fa-2x ${isLocationVerified ? 'text-success' : 'text-primary'}`}></i>
+                      </div>
+                      <p className="text-muted small">Verify you're in the classroom</p>
+                      <button
+                        className={`btn btn-sm ${isLocationVerified ? 'btn-success' : 'btn-primary'} w-100`}
+                        onClick={handleLocationVerification}
+                        disabled={isLocationVerified}
+                      >
+                        {isLocationVerified ? (
+                          <>
+                            <i className="fas fa-check me-1"></i>Verified
+                          </>
+                        ) : (
+                          <>
+                            <i className="fas fa-crosshairs me-1"></i>Verify Location
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Step 3: Biometric Verification */}
+            <div className="col-md-4 mb-3">
+              <div className={`card h-100 ${step3Complete ? 'border-success' : canAccessStep3 ? 'border-primary' : 'border-secondary'}`}>
+                <div className={`card-header ${step3Complete ? 'bg-success text-white' : canAccessStep3 ? 'bg-primary text-white' : 'bg-light'}`}>
+                  <h6 className="mb-0">
+                    <i className={`fas ${step3Complete ? 'fa-check-circle' : 'fa-fingerprint'} me-2`}></i>
+                    Step 3: Biometric Verification {step3Complete && <span className="badge bg-light text-success ms-2">✓</span>}
+                  </h6>
+                </div>
+                <div className="card-body text-center">
+                  {!canAccessStep3 ? (
+                    <div>
+                      <div className="mb-3">
+                        <i className="fas fa-lock fa-2x text-muted"></i>
+                      </div>
+                      <p className="text-muted small">Complete Steps 1 & 2 first</p>
+                      <button className="btn btn-sm btn-secondary w-100" disabled>
+                        <i className="fas fa-lock me-1"></i>Locked
+                      </button>
+                    </div>
+                  ) : fingerprintLoading ? (
+                    <div>
+                      <div className="spinner-border text-primary mb-2" role="status">
+                        <span className="visually-hidden">Loading...</span>
+                      </div>
+                      <p className="text-muted small">Checking fingerprint status...</p>
+                    </div>
+                  ) : !hasFingerprint ? (
+                    <div>
+                      <div className="mb-3">
+                        <i className="fas fa-fingerprint fa-2x text-muted"></i>
+                      </div>
+                      <p className="text-muted small mb-2">No fingerprint registered</p>
+                      <div className="alert alert-warning p-2 mb-2">
+                        <small>
+                          <i className="fas fa-info-circle me-1"></i>
+                          Please register your fingerprint first to use biometric verification
+                        </small>
+                      </div>
+                      <button
+                        className="btn btn-outline-secondary btn-sm w-100"
+                        onClick={() => {
+                          setIsBiometricVerified(true);
+                          setStep3Complete(true);
+                        }}
+                      >
+                        <i className="fas fa-user-check me-1"></i>Skip (Manual Verification)
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="mb-3">
+                        <i className={`fas fa-fingerprint fa-2x ${isBiometricVerified ? 'text-success' : 'text-primary'}`}></i>
+                      </div>
+                      <p className="text-muted small">Verify your identity using fingerprint</p>
+                      <button
+                        className={`btn btn-sm ${isBiometricVerified ? 'btn-success' : 'btn-primary'} w-100`}
+                        onClick={handleBiometricVerification}
+                        disabled={isBiometricVerified}
+                      >
+                        {isBiometricVerified ? (
+                          <>
+                            <i className="fas fa-check me-1"></i>Identity Verified
+                          </>
+                        ) : (
+                          <>
+                            <i className="fas fa-fingerprint me-1"></i>Verify Fingerprint
+                          </>
+                        )}
+                      </button>
+                      {isBiometricVerified && (
+                        <div className="text-success mt-2">
+                          <small>
+                            <i className="fas fa-shield-check me-1"></i>
+                            Biometric verification complete
+                          </small>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-
-        {/* Step 2: Location Verification */}
-        <div className="col-md-4 mb-4">
-          <div className="card h-100">
-            <div className="card-header">
-              <h6><i className="fas fa-map-marker-alt me-2"></i>Step 2: Verify Location</h6>
-            </div>
-            <div className="card-body text-center">
-              <div className="mb-3">
-                <i className={`fas fa-map-marker-alt fa-3x ${isLocationVerified ? 'text-success' : 'text-muted'}`}></i>
+          
+          {/* Step Completion Info */}
+          <div className="text-center mt-4">
+            {!canSubmit && (
+              <div className="alert alert-info mb-3">
+                <i className="fas fa-info-circle me-2"></i>
+                {!step1Complete && "Please complete Step 1: Enter attendance code"}
+                {step1Complete && !step2Complete && "Please complete Step 2: Verify your location"}
+                {step1Complete && step2Complete && !step3Complete && "Please complete Step 3: Biometric verification"}
+                {step1Complete && step2Complete && step3Complete && !isSessionActive && "Session is not active"}
+                {step1Complete && step2Complete && step3Complete && isSessionPaused && "Session is paused"}
+                {step1Complete && step2Complete && step3Complete && timeRemaining <= 0 && "Session has expired"}
               </div>
-              <p className="text-muted small">Verify you're in the classroom</p>
-              <button
-                className={`btn ${isLocationVerified ? 'btn-success' : 'btn-outline-primary'} w-100`}
-                onClick={handleLocationVerification}
-                disabled={isLocationVerified}
-              >
-                {isLocationVerified ? (
-                  <>
-                    <i className="fas fa-check me-2"></i>Verified
-                  </>
-                ) : (
-                  <>
-                    <i className="fas fa-crosshairs me-2"></i>Verify Location
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Step 3: Biometric Verification */}
-        <div className="col-md-4 mb-4">
-          <div className="card h-100">
-            <div className="card-header">
-              <h6><i className="fas fa-fingerprint me-2"></i>Step 3: Biometric Scan</h6>
-            </div>
-            <div className="card-body text-center">
-              <div className="mb-3">
-                <i className={`fas fa-fingerprint fa-3x ${isBiometricVerified ? 'text-success' : 'text-muted'}`}></i>
-              </div>
-              <p className="text-muted small">Scan your fingerprint</p>
-              <button
-                className={`btn ${isBiometricVerified ? 'btn-success' : 'btn-outline-primary'} w-100`}
-                onClick={handleBiometricVerification}
-                disabled={isBiometricVerified}
-              >
-                {isBiometricVerified ? (
-                  <>
-                    <i className="fas fa-check me-2"></i>Verified
-                  </>
-                ) : (
-                  <>
-                    <i className="fas fa-fingerprint me-2"></i>Scan Fingerprint
-                  </>
-                )}
-              </button>
-            </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Submit Button */}
-      <div className="text-center">
-        <button
-          className="btn btn-success btn-lg px-5"
-          onClick={handleSubmitAttendance}
-          disabled={!canSubmit || isSubmitting}
-        >
-          {isSubmitting ? (
-            <>
-              <span className="spinner-border spinner-border-sm me-2" role="status"></span>
-              Marking Attendance...
-            </>
-          ) : (
-            <>
-              <i className="fas fa-check-double me-2"></i>
-              Mark Attendance
-            </>
-          )}
-        </button>
-      </div>
+
 
       {/* Progress Indicator */}
       <div className="card mt-4">

@@ -20,6 +20,12 @@ public class AttendanceController {
 
     @Autowired
     private AttendanceService attendanceService;
+    
+    @Autowired
+    private com.university.attendance.service.LocationVerificationService locationVerificationService;
+    
+    @Autowired
+    private com.university.attendance.repository.ClassSessionRepository classSessionRepository;
 
     @PostMapping("/generate")
     public ResponseEntity<GenerateCodeResponse> generate(@RequestParam String courseCode, 
@@ -29,8 +35,22 @@ public class AttendanceController {
     }
 
     @PostMapping("/start")
-    public ResponseEntity<ClassSession> start(@RequestParam Long sessionId, @RequestParam int duration) {
-        return ResponseEntity.ok(attendanceService.startAttendance(sessionId, duration));
+    public ResponseEntity<ClassSession> start(@RequestParam Long sessionId, 
+                                              @RequestParam int duration,
+                                              @RequestParam(required = false) Double teacherLatitude,
+                                              @RequestParam(required = false) Double teacherLongitude,
+                                              @RequestParam(required = false) String location) {
+        System.out.println("🎯 CONTROLLER: Received start request - sessionId: " + sessionId + 
+                          ", duration: " + duration + ", lat: " + teacherLatitude + 
+                          ", lon: " + teacherLongitude + ", location: " + location);
+        
+        ClassSession result = attendanceService.startAttendance(sessionId, duration, teacherLatitude, teacherLongitude, location);
+        
+        System.out.println("🎯 CONTROLLER: Session started with saved location - lat: " + 
+                          result.getTeacherLatitude() + ", lon: " + result.getTeacherLongitude() + 
+                          ", location: " + result.getLocation());
+        
+        return ResponseEntity.ok(result);
     }
 
     @PostMapping("/mark")
@@ -192,7 +212,7 @@ public class AttendanceController {
             ));
             
             // Step 2: Start attendance
-            ClassSession session = attendanceService.startAttendance(codeResponse.getSessionId(), 120);
+            ClassSession session = attendanceService.startAttendance(codeResponse.getSessionId(), 180);
             result.put("step2_start", Map.of(
                 "success", true,
                 "expiryTime", session.getExpiryTime(),
@@ -215,6 +235,143 @@ public class AttendanceController {
         }
         
         return ResponseEntity.ok(result);
+    }
+    
+    @PostMapping("/verify-location")
+    public ResponseEntity<?> verifyLocation(@RequestBody com.university.attendance.dto.LocationVerificationRequest request) {
+        try {
+            com.university.attendance.dto.LocationVerificationResponse response = 
+                locationVerificationService.verifyLocation(request);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", e.getMessage());
+            errorResponse.put("verified", false);
+            return ResponseEntity.badRequest().body(errorResponse);
+        }
+    }
+    
+    @GetMapping("/debug-session-location")
+    public ResponseEntity<Map<String, Object>> debugSessionLocation(@RequestParam String accessCode) {
+        Map<String, Object> debug = new HashMap<>();
+        
+        try {
+            Optional<ClassSession> sessionOpt = attendanceService.getActiveSession(accessCode);
+            if (sessionOpt.isPresent()) {
+                ClassSession session = sessionOpt.get();
+                debug.put("sessionFound", true);
+                debug.put("sessionId", session.getSessionID());
+                debug.put("accessCode", session.getAccessCode());
+                debug.put("isActive", session.getIsActive());
+                debug.put("teacherLatitude", session.getTeacherLatitude());
+                debug.put("teacherLongitude", session.getTeacherLongitude());
+                debug.put("location", session.getLocation());
+                debug.put("teacherName", session.getTeacherName());
+            } else {
+                debug.put("sessionFound", false);
+                debug.put("message", "No active session found for code: " + accessCode);
+            }
+        } catch (Exception e) {
+            debug.put("error", e.getMessage());
+        }
+        
+        return ResponseEntity.ok(debug);
+    }
+    
+    @PostMapping("/test-location-save")
+    public ResponseEntity<Map<String, Object>> testLocationSave() {
+        Map<String, Object> result = new HashMap<>();
+        
+        try {
+            // Generate a test session
+            GenerateCodeResponse codeResponse = attendanceService.generateCode("TEST101", "Test Teacher", "test_teacher");
+            result.put("step1_generate", "Session generated: " + codeResponse.getSessionId());
+            
+            // Start with location
+            double testLat = 40.7589; // Times Square coordinates for testing
+            double testLon = -73.9851;
+            String testLocation = "Test Classroom";
+            
+            ClassSession session = attendanceService.startAttendance(
+                codeResponse.getSessionId(), 
+                180, 
+                testLat, 
+                testLon, 
+                testLocation
+            );
+            
+            result.put("step2_start", "Session started with location");
+            result.put("savedLatitude", session.getTeacherLatitude());
+            result.put("savedLongitude", session.getTeacherLongitude());
+            result.put("savedLocation", session.getLocation());
+            result.put("sessionId", session.getSessionID());
+            result.put("accessCode", session.getAccessCode());
+            
+            // Verify it's saved properly
+            Optional<ClassSession> retrievedOpt = attendanceService.getActiveSession("TEST101");
+            if (retrievedOpt.isPresent()) {
+                ClassSession retrieved = retrievedOpt.get();
+                result.put("step3_verify", "Location retrieved successfully");
+                result.put("retrievedLatitude", retrieved.getTeacherLatitude());
+                result.put("retrievedLongitude", retrieved.getTeacherLongitude());
+                result.put("retrievedLocation", retrieved.getLocation());
+            } else {
+                result.put("step3_verify", "Failed to retrieve session");
+            }
+            
+            result.put("status", "SUCCESS");
+            
+        } catch (Exception e) {
+            result.put("error", e.getMessage());
+            result.put("status", "FAILED");
+            e.printStackTrace();
+        }
+        
+        return ResponseEntity.ok(result);
+    }
+    
+    @PostMapping("/update-session-location")
+    public ResponseEntity<Map<String, Object>> updateSessionLocation(@RequestParam Long sessionId,
+                                                                     @RequestParam Double latitude,
+                                                                     @RequestParam Double longitude,
+                                                                     @RequestParam(required = false) String location) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            System.out.println("🎯 MANUAL UPDATE: Updating session " + sessionId + " with lat: " + latitude + ", lon: " + longitude);
+            
+            Optional<ClassSession> sessionOpt = attendanceService.getActiveSession("CS101"); // This might need the actual course code
+            if (!sessionOpt.isPresent()) {
+                // Try to get by ID directly
+                ClassSession session = attendanceService.getSession(sessionId);
+                session.setTeacherLatitude(latitude);
+                session.setTeacherLongitude(longitude);
+                if (location != null) {
+                    session.setLocation(location);
+                }
+                
+                // Save using repository directly
+                ClassSession updatedSession = classSessionRepository.save(session);
+                
+                response.put("success", true);
+                response.put("message", "Location updated successfully");
+                response.put("sessionId", updatedSession.getSessionID());
+                response.put("updatedLatitude", updatedSession.getTeacherLatitude());
+                response.put("updatedLongitude", updatedSession.getTeacherLongitude());
+                response.put("updatedLocation", updatedSession.getLocation());
+                
+            } else {
+                response.put("success", false);
+                response.put("message", "Session not found");
+            }
+            
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("error", e.getMessage());
+            e.printStackTrace();
+        }
+        
+        return ResponseEntity.ok(response);
     }
 }
 

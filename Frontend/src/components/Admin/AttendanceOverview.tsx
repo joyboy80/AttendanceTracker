@@ -1,50 +1,140 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import StatsCard from '../Common/StatsCard';
+import attendanceService from '../../services/attendanceService';
 
 const AttendanceOverview = () => {
   const [filters, setFilters] = useState({
     batch: 'all',
-    subject: 'all',
+    course: 'all',
     dateRange: 'week'
   });
 
-  // Mock data
-  const attendanceData = [
-    { id: 1, student: 'John Smith', batch: 'CS-2023', subject: 'Computer Science', date: '2024-01-15', status: 'Present' },
-    { id: 2, student: 'Jane Doe', batch: 'CS-2023', subject: 'Mathematics', date: '2024-01-15', status: 'Present' },
-    { id: 3, student: 'Mike Johnson', batch: 'IT-2023', subject: 'Physics', date: '2024-01-16', status: 'Absent' },
-    { id: 4, student: 'Sarah Wilson', batch: 'CS-2022', subject: 'Computer Science', date: '2024-01-17', status: 'Present' },
-    { id: 5, student: 'Tom Brown', batch: 'IT-2022', subject: 'Chemistry', date: '2024-01-18', status: 'Present' },
-  ];
+  const [attendanceData, setAttendanceData] = useState([]);
+  const [statistics, setStatistics] = useState({
+    totalRecords: 0,
+    presentRecords: 0,
+    absentRecords: 0,
+    attendanceRate: 0
+  });
+  const [batchOptions, setBatchOptions] = useState([{ value: 'all', label: 'All Batches' }]);
+  const [courseOptions, setCourseOptions] = useState([{ value: 'all', label: 'All Courses' }]);
+  const [batchSummary, setBatchSummary] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const batchOptions = [
-    { value: 'all', label: 'All Batches' },
-    { value: 'CS-2023', label: 'CS-2023' },
-    { value: 'CS-2022', label: 'CS-2022' },
-    { value: 'IT-2023', label: 'IT-2023' },
-    { value: 'IT-2022', label: 'IT-2022' }
-  ];
+  // Fetch attendance data from backend
+  const fetchAttendanceData = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const data = await attendanceService.getAttendanceOverview(filters);
+      if (data.success) {
+        setAttendanceData(data.attendanceRecords || []);
+      }
+    } catch (err: any) {
+      setError(err.message);
+      console.error('Error fetching attendance data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const subjectOptions = [
-    { value: 'all', label: 'All Subjects' },
-    { value: 'Computer Science', label: 'Computer Science' },
-    { value: 'Mathematics', label: 'Mathematics' },
-    { value: 'Physics', label: 'Physics' },
-    { value: 'Chemistry', label: 'Chemistry' }
-  ];
+  // Fetch statistics
+  const fetchStatistics = async () => {
+    try {
+      const data = await attendanceService.getStatistics();
+      if (data.success) {
+        setStatistics(data.statistics);
+      }
+    } catch (err) {
+      console.error('Error fetching statistics:', err);
+    }
+  };
+
+  // Fetch batches
+  const fetchBatches = async () => {
+    try {
+      const data = await attendanceService.getBatches();
+      if (data.success) {
+        const options = [{ value: 'all', label: 'All Batches' }];
+        
+        // Add predefined batch options (19, 20, 21, 22 to 30) - only digits
+        const predefinedBatches: string[] = [];
+        for (let year = 19; year <= 30; year++) {
+          predefinedBatches.push(year.toString());
+          options.push({ value: year.toString(), label: year.toString() });
+        }
+        
+        // Add dynamic batches from database (if not already included)
+        data.batches.forEach((batch: string) => {
+          // Only add if not already in predefined batches
+          if (!predefinedBatches.includes(batch)) {
+            options.push({ value: batch, label: batch });
+          }
+        });
+        
+        setBatchOptions(options);
+      }
+    } catch (err) {
+      console.error('Error fetching batches:', err);
+      // Fallback: Add predefined batches even if API fails
+      const options = [{ value: 'all', label: 'All Batches' }];
+      for (let year = 19; year <= 30; year++) {
+        options.push({ value: year.toString(), label: year.toString() });
+      }
+      setBatchOptions(options);
+    }
+  };
+
+  // Fetch courses
+  const fetchCourses = async () => {
+    try {
+      const data = await attendanceService.getCourses();
+      if (data.success) {
+        const options = [{ value: 'all', label: 'All Courses' }];
+        data.courses.forEach((course: any) => {
+          options.push({ value: course.code, label: `${course.code} - ${course.title}` });
+        });
+        setCourseOptions(options);
+      }
+    } catch (err) {
+      console.error('Error fetching courses:', err);
+    }
+  };
+
+  // Fetch batch summary
+  const fetchBatchSummary = async () => {
+    try {
+      const data = await attendanceService.getBatchSummary();
+      if (data.success) {
+        setBatchSummary(data.batchSummary || []);
+      }
+    } catch (err) {
+      console.error('Error fetching batch summary:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchAttendanceData();
+    fetchStatistics();
+    fetchBatches();
+    fetchCourses();
+    fetchBatchSummary();
+  }, []);
 
   const getFilteredData = () => {
-    return attendanceData.filter(record => {
+    return attendanceData.filter((record: any) => {
       const batchMatch = filters.batch === 'all' || record.batch === filters.batch;
-      const subjectMatch = filters.subject === 'all' || record.subject === filters.subject;
-      return batchMatch && subjectMatch;
+      const courseMatch = filters.course === 'all' || record.courseCode === filters.course;
+      return batchMatch && courseMatch;
     });
   };
 
   const calculateStats = () => {
     const filtered = getFilteredData();
     const total = filtered.length;
-    const present = filtered.filter(record => record.status === 'Present').length;
+    const present = filtered.filter((record: any) => record.status === 'PRESENT').length;
     const absent = total - present;
     const percentage = total > 0 ? ((present / total) * 100).toFixed(1) : '0';
     
@@ -54,12 +144,12 @@ const AttendanceOverview = () => {
   const downloadReport = () => {
     const filtered = getFilteredData();
     const csvContent = [
-      ['Student', 'Batch', 'Subject', 'Date', 'Status'],
-      ...filtered.map(record => [
-        record.student,
-        record.batch,
-        record.subject,
-        record.date,
+      ['Student', 'Batch', 'Course', 'Date', 'Status'],
+      ...filtered.map((record: any) => [
+        record.studentName || 'N/A',
+        record.batch || 'N/A',
+        `${record.courseCode} - ${record.courseTitle || ''}`,
+        new Date(record.timestamp).toLocaleDateString(),
         record.status
       ])
     ].map(row => row.join(',')).join('\n');
@@ -73,7 +163,13 @@ const AttendanceOverview = () => {
     window.URL.revokeObjectURL(url);
   };
 
-  const stats = calculateStats();
+  // Use real statistics from backend instead of calculated stats
+  const displayStats = {
+    total: statistics.totalRecords,
+    present: statistics.presentRecords,
+    absent: statistics.absentRecords,
+    percentage: statistics.attendanceRate
+  };
 
   return (
     <div className="fade-in">
@@ -84,7 +180,7 @@ const AttendanceOverview = () => {
         </div>
         <div className="card-body">
           <div className="row">
-            <div className="col-md-3">
+            <div className="col-md-2">
               <label className="form-label">Batch</label>
               <select
                 className="form-select"
@@ -99,13 +195,13 @@ const AttendanceOverview = () => {
               </select>
             </div>
             <div className="col-md-3">
-              <label className="form-label">Subject</label>
+              <label className="form-label">Course</label>
               <select
                 className="form-select"
-                value={filters.subject}
-                onChange={(e) => setFilters({...filters, subject: e.target.value})}
+                value={filters.course}
+                onChange={(e) => setFilters({...filters, course: e.target.value})}
               >
-                {subjectOptions.map(option => (
+                {courseOptions.map(option => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
@@ -125,12 +221,26 @@ const AttendanceOverview = () => {
                 <option value="semester">This Semester</option>
               </select>
             </div>
-            <div className="col-md-3 d-flex align-items-end">
+            <div className="col-md-2 d-flex align-items-end">
+              <button 
+                className="btn btn-primary w-100"
+                onClick={() => {
+                  fetchAttendanceData();
+                  fetchStatistics();
+                  fetchBatchSummary();
+                }}
+                disabled={loading}
+              >
+                <i className="fas fa-sync me-2"></i>Refresh
+              </button>
+            </div>
+            <div className="col-md-2 d-flex align-items-end">
               <button 
                 className="btn btn-success w-100"
                 onClick={downloadReport}
+                disabled={loading || getFilteredData().length === 0}
               >
-                <i className="fas fa-download me-2"></i>Download Report
+                <i className="fas fa-download me-2"></i>Download
               </button>
             </div>
           </div>
@@ -142,33 +252,37 @@ const AttendanceOverview = () => {
         <div className="col-md-3 mb-3">
           <StatsCard
             title="Total Records"
-            value={stats.total}
+            value={displayStats.total || 0}
             icon="fas fa-list"
             color="primary"
+            trend={{ value: 0, isPositive: true }}
           />
         </div>
         <div className="col-md-3 mb-3">
           <StatsCard
             title="Present"
-            value={stats.present}
+            value={displayStats.present || 0}
             icon="fas fa-check-circle"
             color="success"
+            trend={{ value: 0, isPositive: true }}
           />
         </div>
         <div className="col-md-3 mb-3">
           <StatsCard
             title="Absent"
-            value={stats.absent}
+            value={displayStats.absent || 0}
             icon="fas fa-times-circle"
             color="danger"
+            trend={{ value: 0, isPositive: false }}
           />
         </div>
         <div className="col-md-3 mb-3">
           <StatsCard
             title="Attendance Rate"
-            value={`${stats.percentage}%`}
+            value={`${displayStats.percentage || 0}%`}
             icon="fas fa-percentage"
             color="info"
+            trend={{ value: 0, isPositive: true }}
           />
         </div>
       </div>
@@ -194,40 +308,78 @@ const AttendanceOverview = () => {
                       <tr>
                         <th>Student</th>
                         <th>Batch</th>
-                        <th>Subject</th>
+                        <th>Course</th>
                         <th>Date</th>
                         <th>Status</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {getFilteredData().map((record) => (
-                        <tr key={record.id}>
-                          <td>
-                            <div className="d-flex align-items-center">
-                              <div className="bg-primary rounded-circle d-flex align-items-center justify-content-center me-2"
-                                   style={{ width: '32px', height: '32px' }}>
-                                <i className="fas fa-user text-white"></i>
-                              </div>
-                              {record.student}
+                      {loading ? (
+                        <tr>
+                          <td colSpan={5} className="text-center py-4">
+                            <div className="spinner-border text-primary" role="status">
+                              <span className="visually-hidden">Loading...</span>
                             </div>
                           </td>
-                          <td>
-                            <span className="badge bg-info">{record.batch}</span>
-                          </td>
-                          <td>{record.subject}</td>
-                          <td>{new Date(record.date).toLocaleDateString()}</td>
-                          <td>
-                            <span className={`badge ${
-                              record.status === 'Present' ? 'bg-success' : 'bg-danger'
-                            }`}>
-                              <i className={`fas fa-${
-                                record.status === 'Present' ? 'check' : 'times'
-                              } me-1`}></i>
-                              {record.status}
-                            </span>
+                        </tr>
+                      ) : error ? (
+                        <tr>
+                          <td colSpan={5} className="text-center py-4 text-danger">
+                            <i className="fas fa-exclamation-triangle me-2"></i>
+                            {error}
                           </td>
                         </tr>
-                      ))}
+                      ) : getFilteredData().length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="text-center py-4 text-muted">
+                            No attendance records found
+                          </td>
+                        </tr>
+                      ) : (
+                        getFilteredData().map((record: any) => (
+                          <tr key={record.id}>
+                            <td>
+                              <div className="d-flex align-items-center">
+                                <div className="bg-primary rounded-circle d-flex align-items-center justify-content-center me-2"
+                                     style={{ width: '32px', height: '32px' }}>
+                                  <i className="fas fa-user text-white"></i>
+                                </div>
+                                {record.studentName || 'N/A'}
+                              </div>
+                            </td>
+                            <td>
+                              <div>
+                                <span className="badge bg-info">{record.batch || 'N/A'}</span>
+                                {record.userBatch !== record.studentBatch && (
+                                  <div>
+                                    <small className="text-muted">
+                                      User: {record.userBatch || 'None'} | 
+                                      Student: {record.studentBatch || 'None'}
+                                    </small>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                            <td>
+                              <div>
+                                <div className="fw-semibold">{record.courseCode}</div>
+                                <small className="text-muted">{record.courseTitle}</small>
+                              </div>
+                            </td>
+                            <td>{new Date(record.timestamp).toLocaleDateString()}</td>
+                            <td>
+                              <span className={`badge ${
+                                record.status === 'PRESENT' ? 'bg-success' : 'bg-danger'
+                              }`}>
+                                <i className={`fas fa-${
+                                  record.status === 'PRESENT' ? 'check' : 'times'
+                                } me-1`}></i>
+                                {record.status === 'PRESENT' ? 'Present' : record.status === 'ABSENT' ? 'Absent' : record.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -244,27 +396,30 @@ const AttendanceOverview = () => {
               <h6><i className="fas fa-chart-pie me-2"></i>Batch-wise Summary</h6>
             </div>
             <div className="card-body">
-              {batchOptions.slice(1).map(batch => {
-                const batchRecords = attendanceData.filter(r => r.batch === batch.value);
-                const present = batchRecords.filter(r => r.status === 'Present').length;
-                const total = batchRecords.length;
-                const percentage = total > 0 ? ((present / total) * 100).toFixed(1) : '0';
-                
-                return (
-                  <div key={batch.value} className="mb-3">
+              {batchSummary.length === 0 ? (
+                <div className="text-center py-3">
+                  <i className="fas fa-chart-pie fa-2x text-muted mb-2"></i>
+                  <p className="text-muted small">No batch data available</p>
+                </div>
+              ) : (
+                batchSummary.map((batch: any) => (
+                  <div key={batch.batch} className="mb-3">
                     <div className="d-flex justify-content-between align-items-center mb-1">
-                      <span className="fw-semibold">{batch.label}</span>
-                      <span className="small">{percentage}%</span>
+                      <span className="fw-semibold">{batch.batch}</span>
+                      <span className="small">{batch.attendancePercentage}%</span>
                     </div>
                     <div className="progress" style={{ height: '8px' }}>
                       <div
                         className="progress-bar bg-success"
-                        style={{ width: `${percentage}%` }}
+                        style={{ width: `${batch.attendancePercentage}%` }}
                       ></div>
                     </div>
+                    <small className="text-muted">
+                      {batch.presentRecords} present out of {batch.totalRecords} records
+                    </small>
                   </div>
-                );
-              })}
+                ))
+              )}
             </div>
           </div>
 
@@ -274,15 +429,41 @@ const AttendanceOverview = () => {
               <h6><i className="fas fa-exclamation-triangle me-2"></i>Low Attendance Alert</h6>
             </div>
             <div className="card-body">
-              <div className="text-center py-3">
-                <i className="fas fa-user-times fa-2x text-warning mb-2"></i>
-                <p className="text-muted small">
-                  Students with attendance below 75% will be listed here
-                </p>
-                <button className="btn btn-outline-warning btn-sm">
-                  <i className="fas fa-bell me-1"></i>Send Alerts
-                </button>
-              </div>
+              {batchSummary.filter((batch: any) => batch.attendancePercentage < 75).length === 0 ? (
+                <div className="text-center py-3">
+                  <i className="fas fa-check-circle fa-2x text-success mb-2"></i>
+                  <p className="text-muted small">
+                    No batches with low attendance (below 75%)
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  {batchSummary
+                    .filter((batch: any) => batch.attendancePercentage < 75)
+                    .map((batch: any) => (
+                      <div key={batch.batch} className="mb-3 p-2 border-start border-warning border-3">
+                        <div className="d-flex justify-content-between">
+                          <div>
+                            <div className="fw-semibold text-warning">{batch.batch}</div>
+                            <small className="text-muted">
+                              {batch.totalStudents} students
+                            </small>
+                          </div>
+                          <div className="text-end">
+                            <span className="badge bg-warning text-dark">
+                              {batch.attendancePercentage}%
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  <div className="text-center mt-3">
+                    <button className="btn btn-outline-warning btn-sm">
+                      <i className="fas fa-bell me-1"></i>Send Alerts
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

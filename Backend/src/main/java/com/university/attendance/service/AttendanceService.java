@@ -70,12 +70,60 @@ public class AttendanceService {
         }
         
         // Set duration and expiry time
-        int actualDuration = Math.min(durationSeconds, 120); // Max 120 seconds
-        session.setDurationMinutes(actualDuration);
-        session.setExpiryTime(startTime.plusSeconds(actualDuration));
+        session.setDurationMinutes(durationSeconds);
+        session.setExpiryTime(startTime.plusSeconds(durationSeconds));
         session.setIsActive(true);
         
         return classSessionRepository.save(session);
+    }
+    
+    public ClassSession startAttendance(Long sessionId, int durationSeconds, Double teacherLatitude, Double teacherLongitude, String location) {
+        System.out.println("🏫 SERVICE: Starting attendance with location - sessionId: " + sessionId + 
+                          ", lat: " + teacherLatitude + ", lon: " + teacherLongitude + ", location: " + location);
+        
+        // First start the attendance normally
+        ClassSession session = startAttendance(sessionId, durationSeconds);
+        System.out.println("🏫 SERVICE: Base session started, now adding location data...");
+        
+        // Set teacher location information if provided
+        if (teacherLatitude != null && teacherLongitude != null) {
+            System.out.println("🌍 SERVICE: Setting teacher coordinates - lat: " + teacherLatitude + ", lon: " + teacherLongitude);
+            session.setTeacherLatitude(teacherLatitude);
+            session.setTeacherLongitude(teacherLongitude);
+            
+            // Verify the values were set
+            System.out.println("🌍 SERVICE: Coordinates set in entity - lat: " + session.getTeacherLatitude() + ", lon: " + session.getTeacherLongitude());
+        } else {
+            System.out.println("⚠️ SERVICE: No teacher coordinates provided (lat: " + teacherLatitude + ", lon: " + teacherLongitude + ")");
+        }
+        
+        if (location != null && !location.trim().isEmpty()) {
+            System.out.println("🏷️ SERVICE: Setting location name: " + location);
+            session.setLocation(location);
+        } else {
+            System.out.println("⚠️ SERVICE: No location name provided: " + location);
+        }
+        
+        // Force save the session with location data
+        System.out.println("💾 SERVICE: Saving session to database...");
+        ClassSession savedSession = classSessionRepository.save(session);
+        
+        // Verify what was actually saved
+        System.out.println("✅ SERVICE: Session saved! Verifying saved data...");
+        System.out.println("✅ SERVICE: Saved latitude: " + savedSession.getTeacherLatitude());
+        System.out.println("✅ SERVICE: Saved longitude: " + savedSession.getTeacherLongitude());
+        System.out.println("✅ SERVICE: Saved location: " + savedSession.getLocation());
+        System.out.println("✅ SERVICE: Session ID: " + savedSession.getSessionID());
+        
+        // Double-check by retrieving from database
+        Optional<ClassSession> verifySession = classSessionRepository.findById(savedSession.getSessionID());
+        if (verifySession.isPresent()) {
+            ClassSession verified = verifySession.get();
+            System.out.println("🔍 SERVICE: DB Verification - lat: " + verified.getTeacherLatitude() + 
+                              ", lon: " + verified.getTeacherLongitude() + ", location: " + verified.getLocation());
+        }
+        
+        return savedSession;
     }
 
     public Attendance markAttendance(String code, Long studentId, String courseCode) {

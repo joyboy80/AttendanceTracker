@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS users (
     password VARCHAR(255) NOT NULL,
     role ENUM('STUDENT', 'TEACHER', 'ADMIN') NOT NULL,
     batch VARCHAR(20),
+    photo VARCHAR(255),
     enabled BOOLEAN NOT NULL DEFAULT TRUE,
     account_non_expired BOOLEAN NOT NULL DEFAULT TRUE,
     account_non_locked BOOLEAN NOT NULL DEFAULT TRUE,
@@ -28,7 +29,6 @@ CREATE TABLE IF NOT EXISTS teachers (
     teacherID BIGINT AUTO_INCREMENT PRIMARY KEY,
     department VARCHAR(100) NOT NULL,
     designation VARCHAR(100) NOT NULL,
-    photo VARCHAR(255),
     FOREIGN KEY (teacherID) REFERENCES users(userID) ON DELETE CASCADE
 );
 
@@ -38,7 +38,6 @@ CREATE TABLE IF NOT EXISTS students (
     department VARCHAR(100) NOT NULL,
     batch VARCHAR(20) NOT NULL,
     section VARCHAR(10),
-    photo VARCHAR(255),
     FOREIGN KEY (studentID) REFERENCES users(userID) ON DELETE CASCADE
 );
 

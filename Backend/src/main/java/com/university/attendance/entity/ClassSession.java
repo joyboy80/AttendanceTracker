@@ -45,6 +45,15 @@ public class ClassSession {
 
     @Column(name = "teacher_username")
     private String teacherUsername;
+    
+    @Column(name = "teacher_latitude")
+    private Double teacherLatitude;
+    
+    @Column(name = "teacher_longitude")
+    private Double teacherLongitude;
+    
+    @Column(name = "location")
+    private String location;
 
     public Long getSessionID() { return sessionID; }
     public void setSessionID(Long sessionID) { this.sessionID = sessionID; }
@@ -81,6 +90,15 @@ public class ClassSession {
 
     public String getTeacherUsername() { return teacherUsername; }
     public void setTeacherUsername(String teacherUsername) { this.teacherUsername = teacherUsername; }
+    
+    public Double getTeacherLatitude() { return teacherLatitude; }
+    public void setTeacherLatitude(Double teacherLatitude) { this.teacherLatitude = teacherLatitude; }
+    
+    public Double getTeacherLongitude() { return teacherLongitude; }
+    public void setTeacherLongitude(Double teacherLongitude) { this.teacherLongitude = teacherLongitude; }
+    
+    public String getLocation() { return location; }
+    public void setLocation(String location) { this.location = location; }
 }
 
 

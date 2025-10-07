@@ -79,6 +79,10 @@ public class User implements UserDetails {
     @Column(name = "credentials_non_expired", nullable = false)
     private boolean credentialsNonExpired = true;
     
+    @Size(max = 500)
+    @Column(name = "photo")
+    private String photo;
+    
     // Constructors
     public User() {}
     
@@ -183,6 +187,14 @@ public class User implements UserDetails {
     
     public void setBatch(String batch) {
         this.batch = batch;
+    }
+    
+    public String getPhoto() {
+        return photo;
+    }
+    
+    public void setPhoto(String photo) {
+        this.photo = photo;
     }
     
     // UserDetails implementation

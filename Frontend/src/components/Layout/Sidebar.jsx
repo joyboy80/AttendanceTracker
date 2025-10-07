@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import UserProfile from '../Common/UserProfile';
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const [showProfile, setShowProfile] = useState(false);
 
   if (!user) return null;
 
@@ -23,6 +25,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
           { path: '/teacher', icon: 'fas fa-tachometer-alt', label: 'Dashboard' },
           { path: '/teacher/schedule', icon: 'fas fa-calendar-week', label: 'My Schedule' },
           { path: '/teacher/activate', icon: 'fas fa-play-circle', label: 'Activate Attendance' },
+          { path: '/teacher/attendance', icon: 'fas fa-clipboard-check', label: 'View Attendance' },
           { path: '/teacher/courses', icon: 'fas fa-graduation-cap', label: 'My Assigned Courses' },
           { path: '/teacher/statistics', icon: 'fas fa-chart-line', label: 'Statistics' },
         ];
@@ -77,7 +80,25 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         </nav>
 
         <div className="mt-auto p-3 border-top border-light border-opacity-25">
-          <div className="text-center mb-3">
+          <div 
+            className="text-center mb-3 user-info-section" 
+            style={{ 
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              borderRadius: '8px',
+              padding: '8px'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+              e.target.style.transform = 'scale(1.02)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = 'transparent';
+              e.target.style.transform = 'scale(1)';
+            }}
+            onClick={() => setShowProfile(true)}
+            title="View Profile"
+          >
             <div className="bg-light rounded-circle d-inline-flex align-items-center justify-content-center" 
                  style={{ width: '50px', height: '50px' }}>
               <i className="fas fa-user text-primary"></i>
@@ -85,6 +106,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             <div className="mt-2">
               <h6 className="mb-0 text-white">{user.name}</h6>
               <small className="text-light opacity-75">{user.email}</small>
+              <small className="text-light opacity-50 d-block">Click to view profile</small>
             </div>
           </div>
           <button
@@ -95,6 +117,12 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             Logout
           </button>
         </div>
+
+        {/* User Profile Modal */}
+        <UserProfile 
+          isOpen={showProfile}
+          onClose={() => setShowProfile(false)}
+        />
       </div>
     </>
   );

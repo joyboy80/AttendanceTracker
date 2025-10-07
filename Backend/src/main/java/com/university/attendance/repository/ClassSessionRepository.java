@@ -10,6 +10,7 @@ import java.util.Optional;
 public interface ClassSessionRepository extends JpaRepository<ClassSession, Long> {
     Optional<ClassSession> findTopByAccessCodeOrderBySessionIDDesc(String accessCode);
     Optional<ClassSession> findTopByCourseCodeOrderBySessionIDDesc(String courseCode);
+    Optional<ClassSession> findByAccessCodeAndIsActiveTrue(String accessCode);
 }
 
 

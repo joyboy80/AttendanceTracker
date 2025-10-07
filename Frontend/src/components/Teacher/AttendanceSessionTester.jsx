@@ -71,7 +71,7 @@ const AttendanceSessionTester = () => {
 
         // Test 3: Start the session
         try {
-          const startRes = await fetch(`http://localhost:8080/api/attendance/start?sessionId=${genData.sessionId}&duration=120`, {
+          const startRes = await fetch(`http://localhost:8080/api/attendance/start?sessionId=${genData.sessionId}&duration=180`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` }
           });

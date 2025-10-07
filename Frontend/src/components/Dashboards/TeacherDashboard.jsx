@@ -5,6 +5,7 @@ import Header from '../Layout/Header';
 import TeacherOverview from '../Teacher/TeacherOverview';
 import TeacherStatistics from '../Teacher/TeacherStatistics';
 import ActivateAttendance from '../Teacher/ActivateAttendance';
+import ViewAttendance from '../Teacher/ViewAttendance';
 import AssignedCourses from '../Teacher/AssignedCourses.tsx';
 import TeacherSchedule from '../Teacher/TeacherSchedule';
 
@@ -28,6 +29,8 @@ const TeacherDashboard = () => {
         return 'Statistics';
       case '/teacher/activate':
         return 'Activate Attendance';
+      case '/teacher/attendance':
+        return 'Attendance Management';
       case '/teacher/courses':
         return 'Assigned Courses';
       default:
@@ -49,6 +52,7 @@ const TeacherDashboard = () => {
           <Routes>
             <Route path="/" element={<TeacherOverview />} />
             <Route path="/activate" element={<ActivateAttendance />} />
+            <Route path="/attendance" element={<ViewAttendance />} />
             <Route path="/schedule" element={<TeacherSchedule />} />
             <Route path="/statistics" element={<TeacherStatistics />} />
             <Route path="/courses" element={<AssignedCourses />} />

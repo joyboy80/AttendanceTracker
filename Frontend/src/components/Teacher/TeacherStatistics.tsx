@@ -1,32 +1,110 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import StatsCard from '../Common/StatsCard';
+import { useAuth } from '../../contexts/AuthContext';
+import attendanceService from '../../services/attendanceService';
+
+interface AttendanceRecord {
+  date: string;
+  subject: string;
+  present: number;
+  total: number;
+  percentage: number;
+}
+
+interface Student {
+  name: string;
+  rollNo: string;
+  attendance: number;
+  total: number;
+  percentage: number;
+}
+
+interface Course {
+  id: string;
+  name: string;
+}
+
+interface Statistics {
+  totalClasses: number;
+  totalStudents: number;
+  avgAttendance: number;
+  totalPresent: number;
+}
 
 const TeacherStatistics = () => {
+  const { user } = useAuth();
   const [selectedSubject, setSelectedSubject] = useState('all');
   const [dateRange, setDateRange] = useState('week');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Real data states
+  const [statistics, setStatistics] = useState<Statistics>({
+    totalClasses: 0,
+    totalStudents: 0,
+    avgAttendance: 0,
+    totalPresent: 0
+  });
+  const [attendanceData, setAttendanceData] = useState<AttendanceRecord[]>([]);
+  const [studentList, setStudentList] = useState<Student[]>([]);
+  const [courses, setCourses] = useState<Course[]>([{ id: 'all', name: 'All Subjects' }]);
 
-  const subjects = [
-    { id: 'all', name: 'All Subjects' },
-    { id: 'cs101', name: 'Computer Science 101' },
-    { id: 'ds', name: 'Data Structures' },
-    { id: 'algo', name: 'Algorithms' }
-  ];
+  // Fetch teacher statistics data
+  const fetchTeacherStatistics = async () => {
+    if (!user?.id) {
+      console.error('No user ID available');
+      setError('User not authenticated');
+      setLoading(false);
+      return;
+    }
 
-  const attendanceData = [
-    { date: '2024-01-15', subject: 'Computer Science 101', present: 32, total: 35, percentage: 91.4 },
-    { date: '2024-01-16', subject: 'Data Structures', present: 25, total: 28, percentage: 89.3 },
-    { date: '2024-01-17', subject: 'Computer Science 101', present: 33, total: 35, percentage: 94.3 },
-    { date: '2024-01-18', subject: 'Algorithms', present: 28, total: 32, percentage: 87.5 },
-    { date: '2024-01-19', subject: 'Data Structures', present: 26, total: 28, percentage: 92.9 },
-  ];
+    try {
+      setLoading(true);
+      setError(null);
+      console.log('Fetching teacher statistics for user:', user.id, 'course:', selectedSubject);
+      
+      const response = await attendanceService.getTeacherStatistics(user.id, selectedSubject === 'all' ? null : selectedSubject);
+      console.log('Teacher statistics response:', response);
+      
+      if (response.success) {
+        setStatistics(response.statistics || {
+          totalClasses: 0,
+          totalStudents: 0,
+          avgAttendance: 0,
+          totalPresent: 0
+        });
+        setAttendanceData(response.attendanceData || []);
+        setStudentList(response.studentList || []);
+        setCourses(response.courses || [{ id: 'all', name: 'All Subjects' }]);
+      } else {
+        throw new Error(response.error || 'Failed to fetch teacher statistics');
+      }
+    } catch (error: any) {
+      console.error('Error fetching teacher statistics:', error);
+      setError(error.message || 'Failed to load teacher statistics');
+      // Set default values on error
+      setStatistics({
+        totalClasses: 0,
+        totalStudents: 0,
+        avgAttendance: 0,
+        totalPresent: 0
+      });
+      setAttendanceData([]);
+      setStudentList([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const studentList = [
-    { name: 'John Smith', rollNo: 'CS001', attendance: 22, total: 24, percentage: 91.7 },
-    { name: 'Jane Doe', rollNo: 'CS002', attendance: 23, total: 24, percentage: 95.8 },
-    { name: 'Mike Johnson', rollNo: 'CS003', attendance: 20, total: 24, percentage: 83.3 },
-    { name: 'Sarah Wilson', rollNo: 'CS004', attendance: 24, total: 24, percentage: 100.0 },
-    { name: 'Tom Brown', rollNo: 'CS005', attendance: 18, total: 24, percentage: 75.0 },
-  ];
+  // Fetch data on component mount and when selected subject changes
+  useEffect(() => {
+    fetchTeacherStatistics();
+  }, [user?.id, selectedSubject]);
+
+  // Handle subject change
+  const handleSubjectChange = (newSubject: string) => {
+    setSelectedSubject(newSubject);
+  };
 
   const downloadCSV = () => {
     const csvContent = [
@@ -49,28 +127,37 @@ const TeacherStatistics = () => {
     window.URL.revokeObjectURL(url);
   };
 
-  const getFilteredData = () => {
-    if (selectedSubject === 'all') return attendanceData;
-    return attendanceData.filter(record => 
-      record.subject.toLowerCase().includes(selectedSubject === 'cs101' ? 'computer science 101' : selectedSubject)
+  if (loading) {
+    return (
+      <div className="fade-in">
+        <div className="d-flex justify-content-center align-items-center" style={{ height: '400px' }}>
+          <div className="text-center">
+            <div className="spinner-border text-primary" role="status">
+              <span className="visually-hidden">Loading...</span>
+            </div>
+            <p className="mt-3 text-muted">Loading teacher statistics...</p>
+          </div>
+        </div>
+      </div>
     );
-  };
+  }
 
-  const calculateOverallStats = () => {
-    const filtered = getFilteredData();
-    const totalPresent = filtered.reduce((sum, record) => sum + record.present, 0);
-    const totalClasses = filtered.reduce((sum, record) => sum + record.total, 0);
-    const avgPercentage = totalClasses > 0 ? ((totalPresent / totalClasses) * 100).toFixed(1) : '0';
-    
-    return {
-      totalClasses: filtered.length,
-      totalStudents: Math.max(...filtered.map(r => r.total), 0),
-      avgAttendance: avgPercentage,
-      totalPresent
-    };
-  };
-
-  const stats = calculateOverallStats();
+  if (error) {
+    return (
+      <div className="fade-in">
+        <div className="alert alert-danger" role="alert">
+          <i className="fas fa-exclamation-triangle me-2"></i>
+          {error}
+          <button 
+            className="btn btn-outline-danger btn-sm ms-3"
+            onClick={fetchTeacherStatistics}
+          >
+            <i className="fas fa-redo me-1"></i>Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fade-in">
@@ -88,11 +175,11 @@ const TeacherStatistics = () => {
                 <select
                   className="form-select"
                   value={selectedSubject}
-                  onChange={(e) => setSelectedSubject(e.target.value)}
+                  onChange={(e) => handleSubjectChange(e.target.value)}
                 >
-                  {subjects.map(subject => (
-                    <option key={subject.id} value={subject.id}>
-                      {subject.name}
+                  {courses.map((course: Course) => (
+                    <option key={course.id} value={course.id}>
+                      {course.name}
                     </option>
                   ))}
                 </select>
@@ -122,23 +209,25 @@ const TeacherStatistics = () => {
         <div className="col-md-3 mb-3">
           <StatsCard
             title="Total Classes"
-            value={stats.totalClasses}
+            value={statistics.totalClasses}
             icon="fas fa-chalkboard-teacher"
             color="primary"
+            trend={null}
           />
         </div>
         <div className="col-md-3 mb-3">
           <StatsCard
             title="Total Students"
-            value={stats.totalStudents}
+            value={statistics.totalStudents}
             icon="fas fa-user-graduate"
             color="success"
+            trend={null}
           />
         </div>
         <div className="col-md-3 mb-3">
           <StatsCard
             title="Avg Attendance"
-            value={`${stats.avgAttendance}%`}
+            value={`${statistics.avgAttendance}%`}
             icon="fas fa-percentage"
             color="info"
             trend={{ value: 2, isPositive: true }}
@@ -147,9 +236,10 @@ const TeacherStatistics = () => {
         <div className="col-md-3 mb-3">
           <StatsCard
             title="Total Present"
-            value={stats.totalPresent}
+            value={statistics.totalPresent}
             icon="fas fa-check-circle"
             color="warning"
+            trend={null}
           />
         </div>
       </div>
@@ -174,29 +264,37 @@ const TeacherStatistics = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {getFilteredData().map((record, index) => (
-                      <tr key={index}>
-                        <td>{new Date(record.date).toLocaleDateString()}</td>
-                        <td>{record.subject}</td>
-                        <td>
-                          <span className="badge bg-success">{record.present}</span>
-                        </td>
-                        <td>
-                          <span className="badge bg-light text-dark">{record.total}</span>
-                        </td>
-                        <td>
-                          <div className="d-flex align-items-center">
-                            <div className="progress me-2" style={{ width: '60px', height: '8px' }}>
-                              <div
-                                className="progress-bar bg-info"
-                                style={{ width: `${record.percentage}%` }}
-                              ></div>
-                            </div>
-                            <span className="small">{record.percentage}%</span>
-                          </div>
+                    {attendanceData.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="text-center text-muted">
+                          {loading ? 'Loading...' : 'No attendance data available'}
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      attendanceData.map((record: AttendanceRecord, index: number) => (
+                        <tr key={index}>
+                          <td>{new Date(record.date).toLocaleDateString()}</td>
+                          <td>{record.subject}</td>
+                          <td>
+                            <span className="badge bg-success">{record.present}</span>
+                          </td>
+                          <td>
+                            <span className="badge bg-light text-dark">{record.total}</span>
+                          </td>
+                          <td>
+                            <div className="d-flex align-items-center">
+                              <div className="progress me-2" style={{ width: '60px', height: '8px' }}>
+                                <div
+                                  className="progress-bar bg-info"
+                                  style={{ width: `${record.percentage}%` }}
+                                ></div>
+                              </div>
+                              <span className="small">{record.percentage}%</span>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -212,23 +310,29 @@ const TeacherStatistics = () => {
             </div>
             <div className="card-body">
               <div className="list-group list-group-flush">
-                {studentList.slice(0, 5).map((student, index) => (
-                  <div key={index} className="list-group-item d-flex align-items-center px-0">
-                    <div className="me-auto">
-                      <div className="fw-semibold">{student.name}</div>
-                      <small className="text-muted">{student.rollNo}</small>
-                    </div>
-                    <div className="text-end">
-                      <div className="small">{student.attendance}/{student.total}</div>
-                      <span className={`badge ${
-                        student.percentage >= 90 ? 'bg-success' :
-                        student.percentage >= 75 ? 'bg-warning' : 'bg-danger'
-                      }`}>
-                        {student.percentage}%
-                      </span>
-                    </div>
+                {studentList.length === 0 ? (
+                  <div className="text-center text-muted py-3">
+                    {loading ? 'Loading students...' : 'No student data available'}
                   </div>
-                ))}
+                ) : (
+                  studentList.slice(0, 5).map((student: Student, index: number) => (
+                    <div key={index} className="list-group-item d-flex align-items-center px-0">
+                      <div className="me-auto">
+                        <div className="fw-semibold">{student.name}</div>
+                        <small className="text-muted">{student.rollNo}</small>
+                      </div>
+                      <div className="text-end">
+                        <div className="small">{student.attendance}/{student.total}</div>
+                        <span className={`badge ${
+                          student.percentage >= 90 ? 'bg-success' :
+                          student.percentage >= 75 ? 'bg-warning' : 'bg-danger'
+                        }`}>
+                          {student.percentage}%
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>

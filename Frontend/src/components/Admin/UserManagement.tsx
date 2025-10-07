@@ -1,16 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+
+interface User {
+  id: number;
+  username: string;
+  name: string;
+  firstName: string;
+  middleName?: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  role: string;
+  batch?: string;
+  status: string;
+  enabled: boolean;
+  department?: string;
+  section?: string;
+  designation?: string;
+}
 
 const UserManagement = () => {
-  const [users, setUsers] = useState([
-    { id: 1, name: 'John Smith', email: 'john@university.edu', role: 'teacher', status: 'active' },
-    { id: 2, name: 'Jane Doe', email: 'jane@university.edu', role: 'student', status: 'active' },
-    { id: 3, name: 'Mike Wilson', email: 'mike@university.edu', role: 'teacher', status: 'inactive' },
-    { id: 4, name: 'Sarah Johnson', email: 'sarah@university.edu', role: 'student', status: 'active' },
-    { id: 5, name: 'Tom Brown', email: 'tom@university.edu', role: 'admin', status: 'active' },
-  ]);
-
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [editingUser, setEditingUser] = useState(null);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
   const [filterRole, setFilterRole] = useState('all');
 
   const [formData, setFormData] = useState({
@@ -20,49 +33,105 @@ const UserManagement = () => {
     status: 'active'
   });
 
-  const handleAddUser = () => {
-    const newUser = {
-      id: users.length + 1,
-      ...formData
-    };
-    setUsers([...users, newUser]);
-    setFormData({ name: '', email: '', role: 'student', status: 'active' });
-    setShowAddModal(false);
+  // Load users on component mount
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('attendanceToken');
+      if (!token) {
+        setError('Authentication required');
+        return;
+      }
+
+      const response = await fetch('http://localhost:8080/api/admin/users', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to fetch users');
+      }
+
+      if (data.success) {
+        setUsers(data.users || []);
+      } else {
+        throw new Error(data.message || 'Failed to fetch users');
+      }
+    } catch (error: any) {
+      console.error('Error fetching users:', error);
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleEditUser = (user) => {
+
+
+  const handleDeleteUser = async (userId: number) => {
+    if (!window.confirm('Are you sure you want to delete this user?')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('attendanceToken');
+      if (!token) {
+        setError('Authentication required');
+        return;
+      }
+
+      const response = await fetch(`http://localhost:8080/api/admin/users/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to delete user');
+      }
+
+      if (data.success) {
+        // Refresh users list
+        fetchUsers();
+      } else {
+        throw new Error(data.message || 'Failed to delete user');
+      }
+    } catch (error: any) {
+      console.error('Error deleting user:', error);
+      alert('Error deleting user: ' + error.message);
+    }
+  };
+
+  const handleEditUser = (user: User) => {
     setEditingUser(user);
     setFormData({
       name: user.name,
       email: user.email,
-      role: user.role,
+      role: user.role.toLowerCase(),
       status: user.status
     });
     setShowAddModal(true);
   };
 
-  const handleUpdateUser = () => {
-    setUsers(users.map(user => 
-      user.id === editingUser.id ? { ...editingUser, ...formData } : user
-    ));
-    setFormData({ name: '', email: '', role: 'student', status: 'active' });
-    setEditingUser(null);
-    setShowAddModal(false);
-  };
-
-  const handleDeleteUser = (userId) => {
-    if (window.confirm('Are you sure you want to delete this user?')) {
-      setUsers(users.filter(user => user.id !== userId));
-    }
-  };
-
   const getFilteredUsers = () => {
     if (filterRole === 'all') return users;
-    return users.filter(user => user.role === filterRole);
+    return users.filter(user => user.role.toLowerCase() === filterRole);
   };
 
-  const getRoleBadgeColor = (role) => {
-    switch (role) {
+  const getRoleBadgeColor = (role: string) => {
+    switch (role.toLowerCase()) {
       case 'admin': return 'danger';
       case 'teacher': return 'success';
       case 'student': return 'primary';
@@ -70,9 +139,30 @@ const UserManagement = () => {
     }
   };
 
-  const getStatusBadgeColor = (status) => {
-    return status === 'active' ? 'success' : 'secondary';
-  };
+  if (loading) {
+    return (
+      <div className="fade-in text-center">
+        <div className="spinner-border" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+        <p className="mt-2">Loading users...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="fade-in">
+        <div className="alert alert-danger">
+          <h6>Error loading users</h6>
+          <p>{error}</p>
+          <button className="btn btn-danger" onClick={fetchUsers}>
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fade-in">
@@ -99,10 +189,10 @@ const UserManagement = () => {
             </div>
             <div className="col-md-4 text-end">
               <button 
-                className="btn btn-primary"
-                onClick={() => setShowAddModal(true)}
+                className="btn btn-outline-primary"
+                onClick={fetchUsers}
               >
-                <i className="fas fa-plus me-2"></i>Add User
+                <i className="fas fa-sync me-2"></i>Refresh
               </button>
             </div>
           </div>
@@ -111,7 +201,7 @@ const UserManagement = () => {
 
       {/* User Statistics */}
       <div className="row mb-4">
-        <div className="col-md-3">
+        <div className="col-md-4">
           <div className="card bg-primary text-white">
             <div className="card-body text-center">
               <h3>{users.length}</h3>
@@ -119,27 +209,19 @@ const UserManagement = () => {
             </div>
           </div>
         </div>
-        <div className="col-md-3">
+        <div className="col-md-4">
           <div className="card bg-success text-white">
             <div className="card-body text-center">
-              <h3>{users.filter(u => u.role === 'student').length}</h3>
+              <h3>{users.filter(u => u.role.toLowerCase() === 'student').length}</h3>
               <p className="mb-0">Students</p>
             </div>
           </div>
         </div>
-        <div className="col-md-3">
+        <div className="col-md-4">
           <div className="card bg-info text-white">
             <div className="card-body text-center">
-              <h3>{users.filter(u => u.role === 'teacher').length}</h3>
+              <h3>{users.filter(u => u.role.toLowerCase() === 'teacher').length}</h3>
               <p className="mb-0">Teachers</p>
-            </div>
-          </div>
-        </div>
-        <div className="col-md-3">
-          <div className="card bg-warning text-white">
-            <div className="card-body text-center">
-              <h3>{users.filter(u => u.status === 'active').length}</h3>
-              <p className="mb-0">Active</p>
             </div>
           </div>
         </div>
@@ -158,7 +240,6 @@ const UserManagement = () => {
                   <th>Name</th>
                   <th>Email</th>
                   <th>Role</th>
-                  <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -181,21 +262,18 @@ const UserManagement = () => {
                       </span>
                     </td>
                     <td>
-                      <span className={`badge bg-${getStatusBadgeColor(user.status)}`}>
-                        {user.status.charAt(0).toUpperCase() + user.status.slice(1)}
-                      </span>
-                    </td>
-                    <td>
                       <div className="btn-group" role="group">
                         <button 
                           className="btn btn-sm btn-outline-primary"
                           onClick={() => handleEditUser(user)}
+                          title="View Details"
                         >
-                          <i className="fas fa-edit"></i>
+                          <i className="fas fa-eye"></i>
                         </button>
                         <button 
                           className="btn btn-sm btn-outline-danger"
                           onClick={() => handleDeleteUser(user.id)}
+                          title="Delete User"
                         >
                           <i className="fas fa-trash"></i>
                         </button>
@@ -209,14 +287,14 @@ const UserManagement = () => {
         </div>
       </div>
 
-      {/* Add/Edit User Modal */}
-      {showAddModal && (
+      {/* User Details Modal */}
+      {showAddModal && editingUser && (
         <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="modal-dialog">
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">
-                  {editingUser ? 'Edit User' : 'Add New User'}
+                  <i className="fas fa-user me-2"></i>User Details
                 </h5>
                 <button 
                   type="button" 
@@ -224,56 +302,58 @@ const UserManagement = () => {
                   onClick={() => {
                     setShowAddModal(false);
                     setEditingUser(null);
-                    setFormData({ name: '', email: '', role: 'student', status: 'active' });
                   }}
                 ></button>
               </div>
               <div className="modal-body">
-                <form>
-                  <div className="mb-3">
-                    <label className="form-label">Name</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={formData.name}
-                      onChange={(e) => setFormData({...formData, name: e.target.value})}
-                      placeholder="Enter full name"
-                    />
+                <div className="row">
+                  <div className="col-md-6">
+                    <strong>Name:</strong> {editingUser.name}
                   </div>
-                  <div className="mb-3">
-                    <label className="form-label">Email</label>
-                    <input
-                      type="email"
-                      className="form-control"
-                      value={formData.email}
-                      onChange={(e) => setFormData({...formData, email: e.target.value})}
-                      placeholder="Enter email address"
-                    />
+                  <div className="col-md-6">
+                    <strong>Username:</strong> {editingUser.username}
                   </div>
-                  <div className="mb-3">
-                    <label className="form-label">Role</label>
-                    <select
-                      className="form-select"
-                      value={formData.role}
-                      onChange={(e) => setFormData({...formData, role: e.target.value})}
-                    >
-                      <option value="student">Student</option>
-                      <option value="teacher">Teacher</option>
-                      <option value="admin">Admin</option>
-                    </select>
+                </div>
+                <div className="row mt-2">
+                  <div className="col-md-6">
+                    <strong>Email:</strong> {editingUser.email}
                   </div>
-                  <div className="mb-3">
-                    <label className="form-label">Status</label>
-                    <select
-                      className="form-select"
-                      value={formData.status}
-                      onChange={(e) => setFormData({...formData, status: e.target.value})}
-                    >
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
+                  <div className="col-md-6">
+                    <strong>Phone:</strong> {editingUser.phone || 'N/A'}
                   </div>
-                </form>
+                </div>
+                <div className="row mt-2">
+                  <div className="col-md-6">
+                    <strong>Role:</strong> 
+                    <span className={`badge bg-${getRoleBadgeColor(editingUser.role)} ms-2`}>
+                      {editingUser.role.toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+                {editingUser.batch && (
+                  <div className="row mt-2">
+                    <div className="col-md-6">
+                      <strong>Batch:</strong> {editingUser.batch}
+                    </div>
+                  </div>
+                )}
+                {editingUser.department && (
+                  <div className="row mt-2">
+                    <div className="col-md-6">
+                      <strong>Department:</strong> {editingUser.department}
+                    </div>
+                    {editingUser.designation && (
+                      <div className="col-md-6">
+                        <strong>Designation:</strong> {editingUser.designation}
+                      </div>
+                    )}
+                    {editingUser.section && (
+                      <div className="col-md-6">
+                        <strong>Section:</strong> {editingUser.section}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="modal-footer">
                 <button 
@@ -282,17 +362,9 @@ const UserManagement = () => {
                   onClick={() => {
                     setShowAddModal(false);
                     setEditingUser(null);
-                    setFormData({ name: '', email: '', role: 'student', status: 'active' });
                   }}
                 >
-                  Cancel
-                </button>
-                <button 
-                  type="button" 
-                  className="btn btn-primary"
-                  onClick={editingUser ? handleUpdateUser : handleAddUser}
-                >
-                  {editingUser ? 'Update User' : 'Add User'}
+                  Close
                 </button>
               </div>
             </div>

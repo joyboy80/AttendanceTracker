@@ -20,7 +20,7 @@ const ActivateAttendance = () => {
     
     const mockClass = {
       subject: `${activeCourseCode} - ${activeCourseTitle}`,
-      room: 'Room 101',
+      room: 'Room 3307',
       time: '9:00 AM - 11:00 AM',
       totalStudents: 35,
       isScheduled: true
@@ -221,35 +221,156 @@ const ActivateAttendance = () => {
       alert('Please generate a code first');
       return;
     }
+
+        // Get teacher's location before starting attendance
+    if (!navigator.geolocation) {
+      console.warn('⚠️ Geolocation not supported - starting without location');
+      // Fallback - start without location
+      startAttendanceWithLocation(null, null, null);
+      return;
+    }
+
+    console.log('🌍 Requesting teacher GPS location with high accuracy...');
+
+    try {
+      // Get teacher's current location with high accuracy
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude, accuracy } = position.coords;
+          console.log('📍 Teacher GPS captured:', { latitude, longitude, accuracy });
+          
+          const locationName = prompt('Enter classroom/location name (optional):') || `Classroom-${new Date().getTime()}`;
+          console.log('🏫 Location name:', locationName);
+          
+          // Validate coordinates
+          if (isNaN(latitude) || isNaN(longitude)) {
+            console.error('❌ Invalid coordinates:', { latitude, longitude });
+            alert('Invalid GPS coordinates received. Starting without location.');
+            startAttendanceWithLocation(null, null, null);
+            return;
+          }
+          
+          console.log('✅ Valid coordinates - proceeding with location data');
+          startAttendanceWithLocation(latitude, longitude, locationName);
+        },
+        (error) => {
+          console.error('❌ GPS Error:', error.code, error.message);
+          let errorMsg = 'Could not get your location.';
+          
+          switch(error.code) {
+            case error.PERMISSION_DENIED:
+              errorMsg = 'Location permission denied. Please enable location access.';
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMsg = 'Location information is unavailable.';
+              break;
+            case error.TIMEOUT:
+              errorMsg = 'Location request timed out.';
+              break;
+          }
+          
+          const useWithoutLocation = confirm(
+            errorMsg + '\\n\\nStart attendance without location verification?\\n' +
+            '(Students will be able to mark attendance from anywhere)'
+          );
+          
+          if (useWithoutLocation) {
+            console.log('⚠️ Starting without location verification');
+            startAttendanceWithLocation(null, null, null);
+          } else {
+            console.log('❌ Attendance start cancelled');
+          }
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 15000,        // Increased timeout
+          maximumAge: 60000      // Reduced cache age for fresher location
+        }
+      );
+    } catch (error) {
+      console.error('❌ Geolocation API error:', error);
+      startAttendanceWithLocation(null, null, null);
+    }
+  };
+
+  const startAttendanceWithLocation = async (latitude: number | null, longitude: number | null, location: string | null) => {
     try {
       const token = localStorage.getItem('attendanceToken');
       const sessionId = localStorage.getItem('activeAttendanceSessionId');
-      if (sessionId) {
-        const res = await fetch(`http://localhost:8080/api/attendance/start?sessionId=${sessionId}&duration=${timeLimit}`, { 
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        if (!res.ok) {
-          alert('Failed to start attendance session');
-          return;
-        }
-        const session = await res.json();
-        setSessionStartTime(new Date(session.scheduledTime));
-        setSessionEndTime(new Date(session.expiryTime));
-        setSessionAbsoluteEndTime(new Date(session.expiryTime));
-        setTimeRemaining(timeLimit);
-        setIsActive(true);
-        setIsPaused(false);
-        // Load session statistics and start polling for attendees
-        loadSessionStatistics(sessionId);
-        startAttendeePolling();
+      
+      if (!sessionId) {
+        alert('No active session found');
+        return;
       }
-    } catch (e) {
+
+      // Build URL with location parameters
+      let url = `http://localhost:8080/api/attendance/start?sessionId=${sessionId}&duration=${timeLimit}`;
+      
+      if (latitude !== null && longitude !== null && !isNaN(latitude) && !isNaN(longitude)) {
+        // Ensure proper number formatting
+        const formattedLat = latitude.toFixed(8);
+        const formattedLon = longitude.toFixed(8);
+        url += `&teacherLatitude=${formattedLat}&teacherLongitude=${formattedLon}`;
+        console.log('🌍 Teacher GPS coordinates formatted and added:', { 
+          original: { latitude, longitude }, 
+          formatted: { lat: formattedLat, lon: formattedLon },
+          location 
+        });
+      } else {
+        console.log('⚠️ No valid teacher location available:', { latitude, longitude });
+      }
+      
+      if (location && location.trim()) {
+        const encodedLocation = encodeURIComponent(location.trim());
+        url += `&location=${encodedLocation}`;
+        console.log('🏫 Location name encoded and added:', { original: location, encoded: encodedLocation });
+      }
+
+      console.log('📡 Complete request URL:', url);
+      console.log('📋 Request parameters:', {
+        sessionId,
+        duration: timeLimit,
+        teacherLatitude: latitude,
+        teacherLongitude: longitude,
+        location: location
+      });
+
+      const res = await fetch(url, { 
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('❌ Failed to start session:', errorText);
+        alert('Failed to start attendance session: ' + errorText);
+        return;
+      }
+
+      const session = await res.json();
+      console.log('✅ Session started successfully:', session);
+      setSessionStartTime(new Date(session.scheduledTime));
+      setSessionEndTime(new Date(session.expiryTime));
+      setSessionAbsoluteEndTime(new Date(session.expiryTime));
+      setTimeRemaining(timeLimit);
+      setIsActive(true);
+      setIsPaused(false);
+
+      // Show success message with location info
+      if (latitude !== null && longitude !== null) {
+        alert(`✅ Attendance started with GPS location verification enabled!\nStudents must be within 100m of your location.`);
+      } else {
+        alert('✅ Attendance started without location verification.');
+      }
+
+      // Load session statistics and start polling for attendees
+      loadSessionStatistics(sessionId);
+      startAttendeePolling();
+    } catch (e: any) {
       alert('Network error: ' + e.message);
-      return;
     }
   };
 
@@ -270,7 +391,7 @@ const ActivateAttendance = () => {
         });
         if (res.ok) {
           const attendees = await res.json();
-          setAttendedStudents(attendees.map((att, index) => ({
+          setAttendedStudents(attendees.map((att: any, index: number) => ({
             id: att.attendanceId,
             name: att.studentName,
             rollNo: att.rollNumber,
